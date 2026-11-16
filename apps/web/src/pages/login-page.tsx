@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -106,6 +106,7 @@ export function LoginPage() {
           </CardHeader>
 
           <CardContent className="p-6">
+            <p className="mb-4 text-center text-sm text-muted">Ainda não tem cadastro? <Link to="/cadastro" className="font-semibold text-brand-text underline underline-offset-4">Começar cadastro</Link></p>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
               {errorMessage && (
                 <div className="rounded-xl bg-danger-subtle dark:bg-danger-subtle/40 p-3.5 border border-danger-line dark:border-danger-line/50 flex items-start gap-2.5 animate-in fade-in duration-200">
