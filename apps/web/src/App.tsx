@@ -11,6 +11,7 @@ import { ProtectedRoute } from './components/layout/protected-route';
 import { DashboardPage } from './pages/dashboard-page';
 import { LoginPage } from './pages/login-page';
 import { ProfilePage } from './pages/profile-page';
+import { RegistrationPage } from './pages/registration-page';
 import { UsersPage } from './pages/users-page';
 import { SchedulesMfe } from './components/mfe/schedules-mfe';
 import { SuppliesMfe } from './components/mfe/supplies-mfe';
@@ -53,6 +54,7 @@ export function App() {
             <Routes>
               {/* Public Login Route */}
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/cadastro" element={<RegistrationPage />} />
 
               {/* Protected App Routes */}
               <Route

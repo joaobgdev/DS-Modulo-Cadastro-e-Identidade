@@ -7,6 +7,24 @@ separação de responsabilidades. Os domínios funcionais são MFEs independente
 consulte o [catálogo de módulos](module-catalog.md) e o
 [ADR-007](decisions/ADR-007-independent-mfe-modules.md).
 
+## Cadastro no frontend (KAN-80 e KAN-81)
+
+A rota pública `/cadastro`, acessível pelo login, apresenta seleção de cinco
+perfis em dois grupos, dados básicos, uma etapa informativa para dados
+específicos e revisão. O estado vive somente na memória do componente:
+navegar entre etapas preserva valores, enquanto recarregar ou sair descarta
+o preenchimento. Nenhum dado pessoal vai para storage ou API.
+
+O formulário utiliza React Hook Form e Zod para obrigatoriedade, formatos
+de CPF/telefone/e-mail e data de nascimento válida, sem datas futuras.
+CPF nesta etapa é validado por formato; dígitos verificadores e regras de
+responsável por menor pertencem às tarefas específicas de paciente.
+Os campos básicos seguem os prints fornecidos do paciente. Campos próprios
+dos demais perfis ainda precisam das respectivas referências e tarefas.
+A conclusão é explicitamente uma simulação: não cria conta nem permissões.
+Selecionar um perfil não altera o papel de autorização do usuário.
+A interface consome os tokens existentes, sem modificar `index.css`.
+
 ## 0. Topologia do Shell e dos MFEs
 
 ```mermaid
