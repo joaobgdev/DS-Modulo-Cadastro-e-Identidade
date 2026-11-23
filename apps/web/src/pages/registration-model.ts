@@ -23,7 +23,21 @@ export function formatCep(value: string) {
   return digits(value).slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
 }
 
-export const formatCns = (value: string) => digits(value).slice(0, 15);
+export function formatPhone(value: string) {
+  const number = digits(value).slice(0, 11);
+  if (!number) return '';
+  if (number.length < 3) return `(${number}`;
+
+  const split = number.length === 11 ? 7 : 6;
+  const suffix = number.slice(split);
+  return `(${number.slice(0, 2)}) ${number.slice(2, split)}${suffix ? `-${suffix}` : ''}`;
+}
+
+export function formatCns(value: string) {
+  const number = digits(value).slice(0, 15);
+  return [number.slice(0, 3), number.slice(3, 7), number.slice(7, 11), number.slice(11)]
+    .filter(Boolean).join(' ');
+}
 
 // Nesta etapa validamos o formato; a regra de dígitos verificadores é KAN-105.
 export const basicDataSchema = z.object({
@@ -62,7 +76,10 @@ const patientDataSchema = teamDataSchema.extend({
   street: z.string().trim().min(1, 'Informe a rua.'),
   houseNumber: z.string().trim().min(1, 'Informe o número ou digite S/N.'),
   complement: z.string().trim(),
-  cns: z.string().regex(/^(\d{15})?$/, 'Informe os 15 dígitos do Cartão SUS.'),
+  cns: z.string().refine(
+    value => /^\d{15}$/.test(value.replace(/ /g, '')),
+    'Informe os 15 dígitos do Cartão SUS.',
+  ),
 });
 
 export const registrationSchema = (profile: RegistrationProfile | null) =>

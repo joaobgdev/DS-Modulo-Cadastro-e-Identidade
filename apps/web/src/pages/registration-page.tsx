@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Building2, Check, CircleHelp, GraduationCap, Ste
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { emptyBasicData, formatCep, formatCns, formatCpf, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
+import { emptyBasicData, formatCep, formatCns, formatCpf, formatPhone, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
 import { usePatientAddress } from './use-patient-address';
 
 const steps = ['Seleção', 'Dados básicos', 'Específicos', 'Revisão'];
@@ -14,25 +14,28 @@ const stepDescriptions = ['Seleção de perfil', 'Informações iniciais', 'Dado
 const icons = { patient: User, clinic: Building2, administrative: Users, health: Stethoscope, student: GraduationCap };
 const answers = [{ value: 'yes', label: 'Sim' }, { value: 'no', label: 'Não' }, { value: 'undisclosed', label: 'Prefiro não informar' }] as const;
 
-const commonFields = [
-  { name: 'name', label: 'Nome completo (como aparece na certidão de nascimento)', placeholder: 'Maria Silva', autoComplete: 'name' },
-  { name: 'cpf', label: 'CPF', placeholder: '000.000.000-00', inputMode: 'numeric' },
-  { name: 'birthDate', label: 'Data de nascimento', type: 'date', autoComplete: 'bday' },
-  { name: 'phone', label: 'Telefone / WhatsApp', placeholder: '(81) 90000-0000', type: 'tel', autoComplete: 'tel' },
-  { name: 'email', label: 'E-mail', placeholder: 'voce@email.com', type: 'email', autoComplete: 'email' },
-] as const;
-const patientFields = [
-  { name: 'cep', label: 'CEP', placeholder: '00000-000', autoComplete: 'postal-code', inputMode: 'numeric' },
-  { name: 'street', label: 'Rua', autoComplete: 'address-line1' },
-  { name: 'houseNumber', label: 'Número', placeholder: 'Ex.: 10 ou S/N' },
-  { name: 'complement', label: 'Complemento', placeholder: 'Ex.: apartamento 20', autoComplete: 'address-line2' },
-  { name: 'cns', label: 'Número do Cartão SUS (CNS)', inputMode: 'numeric' },
-] as const;
-const teamFields = [
-  { name: 'address', label: 'Endereço completo', placeholder: 'Rua, número, bairro, cidade', autoComplete: 'street-address' },
+const fields = {
+  name: { label: 'Nome completo (como aparece na certidão de nascimento)', placeholder: 'Maria Silva', autoComplete: 'name' },
+  cpf: { label: 'CPF', placeholder: '000.000.000-00', inputMode: 'numeric' },
+  birthDate: { label: 'Data de nascimento', type: 'date', autoComplete: 'bday' },
+  phone: { label: 'Telefone / WhatsApp', placeholder: '(81) 90000-0000', type: 'tel', autoComplete: 'tel' },
+  email: { label: 'E-mail', placeholder: 'voce@email.com', type: 'email', autoComplete: 'email' },
+  cep: { label: 'CEP', placeholder: '00000-000', autoComplete: 'postal-code', inputMode: 'numeric' },
+  street: { label: 'Rua', autoComplete: 'address-line1' },
+  houseNumber: { label: 'Número', placeholder: 'Ex.: 10 ou S/N' },
+  complement: { label: 'Complemento', placeholder: 'Ex.: apartamento 20', autoComplete: 'address-line2' },
+  cns: { label: 'Cartão SUS (CNS)', placeholder: '000 0000 0000 0000', inputMode: 'numeric' },
+  address: { label: 'Endereço completo', placeholder: 'Rua, número, bairro, cidade', autoComplete: 'street-address' },
+  socialName: { label: 'Nome social' },
+} as const;
+const teamFields = ['name', 'cpf', 'birthDate', 'phone', 'email', 'address'] as const;
+const patientSections = [
+  { id: 'personal', title: 'Dados pessoais', fields: ['name', 'socialName', 'birthDate', 'cpf', 'cns'] },
+  { id: 'contact', title: 'Formas de contato', fields: ['email', 'phone'] },
+  { id: 'address', title: 'Endereço', fields: ['cep', 'street', 'houseNumber', 'complement'] },
 ] as const;
 const patientFormatters: Partial<Record<keyof BasicData, (value: string) => string>> = {
-  cpf: formatCpf, cep: formatCep, cns: formatCns,
+  cpf: formatCpf, cep: formatCep, cns: formatCns, phone: formatPhone,
 };
 
 export function RegistrationPage() {
@@ -59,6 +62,10 @@ export function RegistrationPage() {
   }
 
   function chooseProfile(value: RegistrationProfile) {
+    if (value === 'patient') {
+      setValue('cpf', formatCpf(getValues('cpf')));
+      setValue('phone', formatPhone(getValues('phone')));
+    }
     setProfile(value);
     setCompleted(false);
     // Revalida os dados básicos antes de permitir avançar novamente.
@@ -66,8 +73,66 @@ export function RegistrationPage() {
     goTo(1);
   }
 
-  const fields = [...commonFields, ...(isPatient ? patientFields : teamFields)];
   const data = getValues();
+
+  function renderField(name: keyof typeof fields) {
+    const field = name === 'name' && isPatient
+      ? { ...fields.name, label: 'Nome completo', placeholder: 'Como aparece no documento' }
+      : fields[name];
+    const optional = name === 'complement';
+    const input = register(name);
+    const format = isPatient ? patientFormatters[name] : undefined;
+    const isCep = name === 'cep';
+    const error = errors[name]?.message;
+    const description = [error && `error-${name}`, isCep && 'cep-help', isCep && 'cep-result'].filter(Boolean).join(' ');
+    const fullWidth = name === 'address' || (isPatient && (name === 'name' || name === 'cns'));
+
+    return <div key={name} className={fullWidth ? 'sm:col-span-2' : ''}>
+      <Input {...field} id={`registration-${name}`} label={`${field.label} ${optional ? '(opcional)' : '*'}`} required={!optional}
+        className="h-12 rounded-[1.25rem] border-line-strong bg-surface"
+        aria-invalid={!!error} aria-describedby={description || undefined}
+        {...input} onChange={event => {
+          if (format) event.target.value = format(event.target.value);
+          if (name === 'street') markStreetEdited();
+          void input.onChange(event);
+        }} />
+      {error && <p role="alert" id={`error-${name}`} className="mt-1 text-sm text-danger-text">{error}</p>}
+      {isCep && <>
+        <p id="cep-help" className="mt-1 text-sm text-muted">Usamos o ViaCEP para buscar a rua pelo CEP.</p>
+        <p id="cep-result" aria-live="polite" className="text-sm text-muted">{cepMessage}</p>
+      </>}
+    </div>;
+  }
+
+  function renderSocialName() {
+    const error = errors.socialName?.message;
+
+    return <fieldset key="socialName" className="min-w-0 sm:col-span-2">
+      <legend className="mb-2 font-medium text-heading">Você utiliza nome social? <span className="text-sm font-normal text-muted">(opcional)</span></legend>
+      <p className="mb-3 text-sm text-muted">Nome social é o nome pelo qual você prefere ser chamado(a), mesmo que seja diferente do nome que está no documento.</p>
+      <div className="grid gap-2 sm:grid-cols-3">{answers.map(answer => <label key={answer.value} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-[1.25rem] border border-line-strong bg-surface px-4 py-3 text-sm has-checked:border-brand-primary has-checked:bg-brand-subtle">
+        <input type="radio" value={answer.value} className="h-4 w-4 accent-brand-primary" {...register('usesSocialName')} />{answer.label}
+      </label>)}</div>
+      {usesSocialName === 'yes' && <div className="mt-4">
+        <Input id="registration-social-name" label="Como você prefere ser chamado(a)? (opcional)" className="h-12 rounded-[1.25rem] bg-surface" {...register('socialName')}
+          aria-invalid={!!error} aria-describedby={error ? 'error-social-name' : undefined} />
+        {error && <p role="alert" id="error-social-name" className="mt-1 text-sm text-danger-text">{error}</p>}
+      </div>}
+    </fieldset>;
+  }
+
+  function renderReviewFields(names: readonly (keyof typeof fields)[]) {
+    return <dl className="grid gap-5 sm:grid-cols-2">
+      {names.map(name => {
+        const value = data[name].trim();
+        if (!value || (name === 'socialName' && usesSocialName !== 'yes')) return null;
+        return <div key={name} className="min-w-0">
+          <dt className="text-sm text-muted">{name === 'name' && isPatient ? 'Nome completo' : fields[name].label}</dt>
+          <dd className="mt-1 break-words font-medium text-heading">{name === 'birthDate' ? value.split('-').reverse().join('/') : value}</dd>
+        </div>;
+      })}
+    </dl>;
+  }
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden bg-canvas px-4 py-6 text-body sm:px-8 sm:py-10">
@@ -110,18 +175,18 @@ export function RegistrationPage() {
 
         <main className="rounded-[2rem] border border-line bg-surface p-5 shadow-sm sm:p-10">
           <h1 ref={heading} tabIndex={-1} className="text-3xl font-bold tracking-tight text-heading outline-none sm:text-4xl">
-            {completed ? 'Simulação concluída' : ['Quem você quer cadastrar?', 'Dados pessoais', 'Dados específicos', 'Revise as informações'][step]}
+            {completed ? 'Simulação concluída' : ['Quem você quer cadastrar?', isPatient ? 'Dados básicos' : 'Dados pessoais', 'Dados específicos', 'Revise as informações'][step]}
           </h1>
           {completed ? <div className="mt-6 space-y-6">
             <p role="status">Você concluiu a simulação de cadastro. Nenhuma conta foi criada.</p>
             <Button onClick={() => { reset(emptyBasicData); setProfile(null); setGroup('patient'); setCompleted(false); setFurthestStep(0); goTo(0); }}>Iniciar novo cadastro</Button>
           </div> : <>
-            <p className="mt-3 text-base text-muted sm:text-lg">{[
+            {!(step === 1 && isPatient) && <p className="mt-3 text-base text-muted sm:text-lg">{[
               <>Escolha uma opção para começar. Se você vai receber atendimento, selecione <strong className="text-heading">Sou paciente.</strong></>,
               'Informações iniciais para identificar a conta no sistema.',
               'Confira o perfil escolhido antes de revisar as informações.',
               'Confira os dados preenchidos. Você pode voltar para corrigir qualquer informação.',
-            ][step]}</p>
+            ][step]}</p>}
 
             {step === 0 && <>
               <div role="group" aria-label="Tipo de cadastro" className="my-7 grid grid-cols-2 gap-1 rounded-3xl border border-line bg-surface-muted p-1.5">
@@ -157,46 +222,23 @@ export function RegistrationPage() {
             </>}
 
             {step === 1 && <form noValidate onSubmit={handleSubmit(() => goTo(2))} className="mt-8">
-              <section aria-label="Informações iniciais" className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
+              {isPatient ? <div className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
+                <p className="mb-5 text-sm text-muted">Campos com <strong>*</strong> são obrigatórios.</p>
+                {patientSections.map((section, index) => <section key={section.id} aria-labelledby={`basic-${section.id}`} className="mb-7 border-b border-line pb-7 last:mb-0 last:border-b-0 last:pb-0">
+                  <h2 id={`basic-${section.id}`} className="mb-4 text-xl font-semibold text-heading">{index + 1}. {section.title}</h2>
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {section.fields.map(name => name === 'socialName' ? renderSocialName() : renderField(name))}
+                  </div>
+                </section>)}
+              </div> : <section aria-label="Informações iniciais" className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Informações iniciais · {currentProfile?.label}</h2>
                 <p className="mb-5 mt-3 text-sm text-muted">Campos com <strong>*</strong> são obrigatórios.</p>
-                <div className="grid gap-5 sm:grid-cols-2">
-                  {fields.map(field => {
-                    const optional = field.name === 'complement' || field.name === 'cns';
-                    const input = register(field.name);
-                    const format = isPatient ? patientFormatters[field.name] : undefined;
-                    const isCep = field.name === 'cep';
-                    const description = [errors[field.name] && `error-${field.name}`, isCep && 'cep-help', isCep && 'cep-result'].filter(Boolean).join(' ');
-
-                    return <div key={field.name} className={field.name === 'address' ? 'sm:col-span-2' : ''}>
-                      <Input {...field} id={`registration-${field.name}`} label={`${field.label} ${optional ? '(opcional)' : '*'}`} required={!optional}
-                        className="h-12 rounded-[1.25rem] border-line-strong bg-surface"
-                        aria-invalid={!!errors[field.name]} aria-describedby={description || undefined}
-                        {...input} onChange={event => {
-                          if (format) event.target.value = format(event.target.value);
-                          if (field.name === 'street') markStreetEdited();
-                          void input.onChange(event);
-                        }} />
-                      {errors[field.name] && <p role="alert" id={`error-${field.name}`} className="mt-1 text-sm text-danger-text">{errors[field.name]?.message}</p>}
-                      {isCep && <>
-                        <p id="cep-help" className="mt-1 text-sm text-muted">Usamos o ViaCEP para buscar a rua pelo CEP.</p>
-                        <p id="cep-result" aria-live="polite" className="text-sm text-muted">{cepMessage}</p>
-                      </>}
-                    </div>;
-                  })}
-                </div>
+                <div className="grid gap-5 sm:grid-cols-2">{teamFields.map(renderField)}</div>
                 <div className="mt-7 space-y-6 border-t border-line pt-7">
                   <div><h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Identificação e acolhimento</h2><p className="mt-3 text-sm text-muted">Estas perguntas são opcionais. Você pode responder, escolher “Prefiro não informar” ou pular.</p></div>
-                  {([{ name: 'usesSocialName', title: 'Você utiliza nome social?' }] as const).map(question => <fieldset key={question.name}>
-                    <legend className="mb-2 font-medium text-heading">{question.title} <span className="text-sm font-normal text-muted">(opcional)</span></legend>
-                    {question.name === 'usesSocialName' && <p className="mb-3 text-sm text-muted">Nome social é o nome pelo qual você prefere ser chamado(a), mesmo que seja diferente do nome que está no documento.</p>}
-                    <div className="grid gap-2 sm:grid-cols-3">{answers.map(answer => <label key={answer.value} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-[1.25rem] border border-line-strong bg-surface px-4 py-3 text-sm has-checked:border-brand-primary has-checked:bg-brand-subtle">
-                      <input type="radio" value={answer.value} className="h-4 w-4 accent-brand-primary" {...register(question.name)} />{answer.label}
-                    </label>)}</div>
-                    {question.name === 'usesSocialName' && usesSocialName === 'yes' && <div className="mt-4"><Input id="registration-social-name" label="Como você prefere ser chamado(a)? (opcional)" className="h-12 rounded-[1.25rem] bg-surface" {...register('socialName')} error={errors.socialName?.message} /></div>}
-                  </fieldset>)}
+                  {renderSocialName()}
                 </div>
-              </section>
+              </section>}
               <div className="mt-8 flex flex-wrap items-center justify-between gap-4"><p className="text-sm text-muted">Perfil: {currentProfile?.label}</p><div className="flex gap-3"><Button type="button" variant="outline" className="rounded-full" onClick={() => goTo(0)}>Voltar</Button><Button type="submit" className="rounded-full">Próximo<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div></div>
             </form>}
 
@@ -207,9 +249,10 @@ export function RegistrationPage() {
 
             {step === 3 && <div className="mt-8 space-y-6">
               <section className="rounded-3xl bg-accent-subtle p-7"><h2 className="mb-6 text-xl font-semibold text-heading">Perfil: {currentProfile?.label}</h2>
-                <dl className="grid gap-5 sm:grid-cols-2">{fields.filter(field => data[field.name].trim()).map(field => <div key={field.name} className="min-w-0"><dt className="text-sm text-muted">{field.label}</dt><dd className="mt-1 break-words font-medium text-heading">{field.name === 'birthDate' ? data.birthDate.split('-').reverse().join('/') : data[field.name].trim()}</dd></div>)}
-                  {usesSocialName === 'yes' && data.socialName && <div><dt className="text-sm text-muted">Nome social</dt><dd className="mt-1 break-words font-medium text-heading">{data.socialName}</dd></div>}
-                </dl>
+                {isPatient ? patientSections.map(section => <section key={section.id} aria-labelledby={`review-${section.id}`} className="mb-6 border-b border-line pb-6 last:mb-0 last:border-b-0 last:pb-0">
+                  <h3 id={`review-${section.id}`} className="mb-4 text-lg font-semibold text-heading">{section.title}</h3>
+                  {renderReviewFields(section.fields)}
+                </section>) : renderReviewFields([...teamFields, 'socialName'])}
               </section>
               <p className="text-sm text-muted">Ao concluir, você termina somente esta simulação.</p>
               <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" className="rounded-full" onClick={() => goTo(2)}>Voltar</Button><Button className="rounded-full" onClick={handleSubmit(() => setCompleted(true), () => goTo(1))}>Concluir simulação<Check aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
