@@ -6,12 +6,34 @@ import { ArrowLeft, ArrowRight, Building2, Check, CircleHelp, GraduationCap, Ste
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { basicDataSchema, emptyBasicData, registrationProfiles, type BasicData, type RegistrationProfile } from './registration-model';
+import { emptyBasicData, formatCep, formatCns, formatCpf, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
+import { usePatientAddress } from './use-patient-address';
 
 const steps = ['Seleção', 'Dados básicos', 'Específicos', 'Revisão'];
 const stepDescriptions = ['Seleção de perfil', 'Informações iniciais', 'Dados do perfil', 'Confira seus dados'];
 const icons = { patient: User, clinic: Building2, administrative: Users, health: Stethoscope, student: GraduationCap };
 const answers = [{ value: 'yes', label: 'Sim' }, { value: 'no', label: 'Não' }, { value: 'undisclosed', label: 'Prefiro não informar' }] as const;
+
+const commonFields = [
+  { name: 'name', label: 'Nome completo (como aparece na certidão de nascimento)', placeholder: 'Maria Silva', autoComplete: 'name' },
+  { name: 'cpf', label: 'CPF', placeholder: '000.000.000-00', inputMode: 'numeric' },
+  { name: 'birthDate', label: 'Data de nascimento', type: 'date', autoComplete: 'bday' },
+  { name: 'phone', label: 'Telefone / WhatsApp', placeholder: '(81) 90000-0000', type: 'tel', autoComplete: 'tel' },
+  { name: 'email', label: 'E-mail', placeholder: 'voce@email.com', type: 'email', autoComplete: 'email' },
+] as const;
+const patientFields = [
+  { name: 'cep', label: 'CEP', placeholder: '00000-000', autoComplete: 'postal-code', inputMode: 'numeric' },
+  { name: 'street', label: 'Rua', autoComplete: 'address-line1' },
+  { name: 'houseNumber', label: 'Número', placeholder: 'Ex.: 10 ou S/N' },
+  { name: 'complement', label: 'Complemento', placeholder: 'Ex.: apartamento 20', autoComplete: 'address-line2' },
+  { name: 'cns', label: 'Número do Cartão SUS (CNS)', inputMode: 'numeric' },
+] as const;
+const teamFields = [
+  { name: 'address', label: 'Endereço completo', placeholder: 'Rua, número, bairro, cidade', autoComplete: 'street-address' },
+] as const;
+const patientFormatters: Partial<Record<keyof BasicData, (value: string) => string>> = {
+  cpf: formatCpf, cep: formatCep, cns: formatCns,
+};
 
 export function RegistrationPage() {
   const [step, setStep] = useState(0);
@@ -21,10 +43,13 @@ export function RegistrationPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [completed, setCompleted] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const { register, handleSubmit, watch, getValues, reset, formState: { errors } } = useForm<BasicData>({
-    resolver: zodResolver(basicDataSchema), defaultValues: emptyBasicData, mode: 'onTouched',
+  const { register, handleSubmit, watch, getValues, setValue, reset, formState: { errors } } = useForm<BasicData>({
+    resolver: zodResolver(registrationSchema(profile)), defaultValues: emptyBasicData, mode: 'onTouched',
   });
   const usesSocialName = watch('usesSocialName');
+  const cep = watch('cep');
+  const isPatient = profile === 'patient';
+  const { message: cepMessage, markStreetEdited } = usePatientAddress(isPatient ? cep : '', getValues, setValue);
   const currentProfile = registrationProfiles.find(item => item.id === profile);
 
   function goTo(next: number) {
@@ -41,14 +66,7 @@ export function RegistrationPage() {
     goTo(1);
   }
 
-  const fields = [
-    { name: 'name', label: 'Nome completo (como aparece na certidão de nascimento)', placeholder: 'Maria Silva', autoComplete: 'name' },
-    { name: 'cpf', label: 'CPF', placeholder: '000.000.000-00', inputMode: 'numeric' },
-    { name: 'birthDate', label: 'Data de nascimento', type: 'date', autoComplete: 'bday' },
-    { name: 'phone', label: 'Telefone / WhatsApp', placeholder: '(81) 90000-0000', type: 'tel', autoComplete: 'tel' },
-    { name: 'email', label: 'E-mail', placeholder: 'voce@email.com', type: 'email', autoComplete: 'email' },
-    { name: 'address', label: 'Endereço completo', placeholder: 'Rua, número, bairro, cidade', autoComplete: 'street-address' },
-  ] as const;
+  const fields = [...commonFields, ...(isPatient ? patientFields : teamFields)];
   const data = getValues();
 
   return (
@@ -69,7 +87,7 @@ export function RegistrationPage() {
           </div>
         </header>
 
-        {showHelp && <aside id="registration-help" className="mb-6 rounded-2xl border border-line bg-surface p-5 text-sm">Escolha o perfil de quem será cadastrado. Preencha os campos com * e use Voltar para corrigir informações. Os dados ficam somente nesta página e são descartados ao recarregar ou sair dela.</aside>}
+        {showHelp && <aside id="registration-help" className="mb-6 rounded-2xl border border-line bg-surface p-5 text-sm">Escolha o perfil de quem será cadastrado. Preencha os campos com * e use Voltar para corrigir informações. Os dados do formulário são descartados ao recarregar ou sair desta página.</aside>}
 
         <nav aria-label="Etapas do cadastro" className="mb-7">
           <div className="mb-3 flex justify-between gap-4 text-xs font-bold uppercase tracking-widest text-brand-text">
@@ -95,11 +113,11 @@ export function RegistrationPage() {
             {completed ? 'Simulação concluída' : ['Quem você quer cadastrar?', 'Dados pessoais', 'Dados específicos', 'Revise as informações'][step]}
           </h1>
           {completed ? <div className="mt-6 space-y-6">
-            <p role="status">Você concluiu a simulação de cadastro. Nenhuma conta foi criada e nenhum dado foi salvo ou enviado.</p>
+            <p role="status">Você concluiu a simulação de cadastro. Nenhuma conta foi criada.</p>
             <Button onClick={() => { reset(emptyBasicData); setProfile(null); setGroup('patient'); setCompleted(false); setFurthestStep(0); goTo(0); }}>Iniciar novo cadastro</Button>
           </div> : <>
             <p className="mt-3 text-base text-muted sm:text-lg">{[
-              <>Escolha uma opção para começar. Se a pessoa vai receber atendimento, selecione <strong className="text-heading">Paciente.</strong></>,
+              <>Escolha uma opção para começar. Se você vai receber atendimento, selecione <strong className="text-heading">Sou paciente.</strong></>,
               'Informações iniciais para identificar a conta no sistema.',
               'Confira o perfil escolhido antes de revisar as informações.',
               'Confira os dados preenchidos. Você pode voltar para corrigir qualquer informação.',
@@ -117,7 +135,7 @@ export function RegistrationPage() {
                     const Icon = icons[item.id];
                     return <article key={item.id} className={`flex h-full flex-col items-start rounded-3xl border p-6 sm:p-8 ${profile === item.id ? 'border-brand-primary bg-brand-subtle' : 'border-line bg-accent-subtle'}`}>
                       <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl bg-brand-primary text-on-brand shadow-sm"><Icon aria-hidden="true" className="h-8 w-8" /></span>
-                      <h2 className="text-2xl font-bold text-heading">{item.id === 'patient' ? 'Cadastrar paciente' : item.label}</h2>
+                      <h2 className="text-2xl font-bold text-heading">{item.id === 'patient' ? 'Sou paciente' : item.label}</h2>
                       <p className="mb-7 mt-3 flex-1 leading-relaxed">{item.description}</p>
                       <Button className="h-auto min-h-12 gap-2 whitespace-normal rounded-full py-3 text-left" onClick={() => chooseProfile(item.id)}>
                         {item.id === 'patient' ? 'Começar cadastro de paciente' : `Selecionar ${item.label.toLowerCase()}`}<ArrowRight aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -143,13 +161,29 @@ export function RegistrationPage() {
                 <h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Informações iniciais · {currentProfile?.label}</h2>
                 <p className="mb-5 mt-3 text-sm text-muted">Campos com <strong>*</strong> são obrigatórios.</p>
                 <div className="grid gap-5 sm:grid-cols-2">
-                  {fields.map(field => <div key={field.name} className={field.name === 'address' ? 'sm:col-span-2' : ''}>
-                    <Input {...field} id={`registration-${field.name}`} label={`${field.label} *`} required
-                      className="h-12 rounded-[1.25rem] border-line-strong bg-surface"
-                      aria-invalid={!!errors[field.name]} aria-describedby={errors[field.name] ? `error-${field.name}` : undefined}
-                      {...register(field.name)} />
-                    {errors[field.name] && <p role="alert" id={`error-${field.name}`} className="mt-1 text-sm text-danger-text">{errors[field.name]?.message}</p>}
-                  </div>)}
+                  {fields.map(field => {
+                    const optional = field.name === 'complement' || field.name === 'cns';
+                    const input = register(field.name);
+                    const format = isPatient ? patientFormatters[field.name] : undefined;
+                    const isCep = field.name === 'cep';
+                    const description = [errors[field.name] && `error-${field.name}`, isCep && 'cep-help', isCep && 'cep-result'].filter(Boolean).join(' ');
+
+                    return <div key={field.name} className={field.name === 'address' ? 'sm:col-span-2' : ''}>
+                      <Input {...field} id={`registration-${field.name}`} label={`${field.label} ${optional ? '(opcional)' : '*'}`} required={!optional}
+                        className="h-12 rounded-[1.25rem] border-line-strong bg-surface"
+                        aria-invalid={!!errors[field.name]} aria-describedby={description || undefined}
+                        {...input} onChange={event => {
+                          if (format) event.target.value = format(event.target.value);
+                          if (field.name === 'street') markStreetEdited();
+                          void input.onChange(event);
+                        }} />
+                      {errors[field.name] && <p role="alert" id={`error-${field.name}`} className="mt-1 text-sm text-danger-text">{errors[field.name]?.message}</p>}
+                      {isCep && <>
+                        <p id="cep-help" className="mt-1 text-sm text-muted">Usamos o ViaCEP para buscar a rua pelo CEP.</p>
+                        <p id="cep-result" aria-live="polite" className="text-sm text-muted">{cepMessage}</p>
+                      </>}
+                    </div>;
+                  })}
                 </div>
                 <div className="mt-7 space-y-6 border-t border-line pt-7">
                   <div><h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Identificação e acolhimento</h2><p className="mt-3 text-sm text-muted">Estas perguntas são opcionais. Você pode responder, escolher “Prefiro não informar” ou pular.</p></div>
@@ -173,18 +207,18 @@ export function RegistrationPage() {
 
             {step === 3 && <div className="mt-8 space-y-6">
               <section className="rounded-3xl bg-accent-subtle p-7"><h2 className="mb-6 text-xl font-semibold text-heading">Perfil: {currentProfile?.label}</h2>
-                <dl className="grid gap-5 sm:grid-cols-2">{fields.map(field => <div key={field.name} className="min-w-0"><dt className="text-sm text-muted">{field.label}</dt><dd className="mt-1 break-words font-medium text-heading">{field.name === 'birthDate' ? data.birthDate.split('-').reverse().join('/') : data[field.name]}</dd></div>)}
+                <dl className="grid gap-5 sm:grid-cols-2">{fields.filter(field => data[field.name].trim()).map(field => <div key={field.name} className="min-w-0"><dt className="text-sm text-muted">{field.label}</dt><dd className="mt-1 break-words font-medium text-heading">{field.name === 'birthDate' ? data.birthDate.split('-').reverse().join('/') : data[field.name].trim()}</dd></div>)}
                   {usesSocialName === 'yes' && data.socialName && <div><dt className="text-sm text-muted">Nome social</dt><dd className="mt-1 break-words font-medium text-heading">{data.socialName}</dd></div>}
                 </dl>
               </section>
-              <p className="text-sm text-muted">Ao concluir, você termina somente esta simulação. Nenhum dado será enviado ou salvo.</p>
+              <p className="text-sm text-muted">Ao concluir, você termina somente esta simulação.</p>
               <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" className="rounded-full" onClick={() => goTo(2)}>Voltar</Button><Button className="rounded-full" onClick={handleSubmit(() => setCompleted(true), () => goTo(1))}>Concluir simulação<Check aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
             </div>}
           </>}
         </main>
         <footer className="mt-6 space-y-2 text-center text-sm leading-relaxed text-muted">
           <p>Diferentes contas possuem diferentes acessos e enxergam o sistema de maneira diferente.</p>
-          <p>Protótipo acadêmico · Clínica Digital UFPE · Nenhum dado é salvo ou enviado.</p>
+          <p>Protótipo acadêmico · Clínica Digital UFPE · Nenhuma conta é criada nesta simulação.</p>
         </footer>
       </div>
     </div>

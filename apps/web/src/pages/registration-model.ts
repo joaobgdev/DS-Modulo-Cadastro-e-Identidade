@@ -12,6 +12,19 @@ export type RegistrationProfile = typeof registrationProfiles[number]['id'];
 
 const digits = (value: string) => value.replace(/\D/g, '');
 
+export function formatCpf(value: string) {
+  return digits(value).slice(0, 11)
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3}\.\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3}\.\d{3}\.\d{3})(\d)/, '$1-$2');
+}
+
+export function formatCep(value: string) {
+  return digits(value).slice(0, 8).replace(/^(\d{5})(\d)/, '$1-$2');
+}
+
+export const formatCns = (value: string) => digits(value).slice(0, 15);
+
 // Nesta etapa validamos o formato; a regra de dígitos verificadores é KAN-105.
 export const basicDataSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome completo.').max(120, 'Use no máximo 120 caracteres.'),
@@ -35,8 +48,29 @@ export const basicDataSchema = z.object({
   socialName: z.string().trim().max(120, 'Use no máximo 120 caracteres.'),
 });
 
-export type BasicData = z.infer<typeof basicDataSchema>;
+const teamDataSchema = basicDataSchema.extend({
+  cep: z.string(),
+  street: z.string(),
+  houseNumber: z.string(),
+  complement: z.string(),
+  cns: z.string(),
+});
+
+const patientDataSchema = teamDataSchema.extend({
+  address: z.string(),
+  cep: z.string().regex(/^\d{5}-\d{3}$/, 'Informe um CEP com 8 dígitos.'),
+  street: z.string().trim().min(1, 'Informe a rua.'),
+  houseNumber: z.string().trim().min(1, 'Informe o número ou digite S/N.'),
+  complement: z.string().trim(),
+  cns: z.string().regex(/^(\d{15})?$/, 'Informe os 15 dígitos do Cartão SUS.'),
+});
+
+export const registrationSchema = (profile: RegistrationProfile | null) =>
+  profile === 'patient' ? patientDataSchema : teamDataSchema;
+
+export type BasicData = z.infer<typeof teamDataSchema>;
 export const emptyBasicData: BasicData = {
   name: '', cpf: '', birthDate: '', phone: '', email: '', address: '',
+  cep: '', street: '', houseNumber: '', complement: '', cns: '',
   usesSocialName: '', socialName: '',
 };
