@@ -32,7 +32,7 @@ const fields = {
   bloodType: { label: 'Tipo sanguíneo', options: bloodTypes, optional: true },
   hasAllergies: { label: 'Você tem alergias conhecidas?', options: allergyOptions, optional: true },
   allergies: { label: 'Quais são as alergias?', optional: true, multiline: true },
-  healthConditions: { label: 'Condições de saúde importantes', optional: true, multiline: true },
+  healthConditions: { label: 'Condições de saúde importantes', optional: true, multiline: true, placeholder: 'Ex.: hipertensão, diabetes ou outra condição importante.' },
   emergencyName: { label: 'Nome e sobrenome do contato' },
   emergencyPhone: { label: 'Telefone do contato', type: 'tel', placeholder: '(81) 90000-0000' },
   emergencyRelationship: { label: 'Relação com o paciente', options: emergencyRelationships },
@@ -129,7 +129,7 @@ export function RegistrationPage() {
         {'options' in field ? <select {...control} className={`${fieldClassName} w-full border px-3 text-sm text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
           <option value="">Selecione</option>
           {field.options.map(option => <option key={option}>{option}</option>)}
-        </select> : <textarea {...control} rows={3} className="w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-sm text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" />}
+        </select> : <textarea {...control} rows={3} placeholder={'placeholder' in field ? field.placeholder : undefined} className="w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-sm text-body placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" />}
       </div> : <Input {...field} {...control} label={label} className={fieldClassName}
         onChange={event => {
           if (format) event.target.value = format(event.target.value);
