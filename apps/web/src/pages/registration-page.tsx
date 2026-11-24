@@ -114,6 +114,7 @@ export function RegistrationPage() {
     const error = errors[name]?.message;
     const description = [error && `error-${name}`, isCep && 'cep-help', isCep && 'cep-result'].filter(Boolean).join(' ');
     const multiline = 'multiline' in field;
+    const textSize = name === 'healthConditions' ? 'text-base' : 'text-sm';
     const fullWidth = multiline || name === 'address' || (isPatient && (name === 'name' || name === 'cns'));
     const control = {
       id: `registration-${name}`,
@@ -125,11 +126,11 @@ export function RegistrationPage() {
 
     return <div key={name} className={fullWidth ? 'sm:col-span-2' : ''}>
       {'options' in field || multiline ? <div className="flex w-full flex-col gap-1.5">
-        <label htmlFor={control.id} className="text-sm font-medium text-heading">{label}</label>
+        <label htmlFor={control.id} className={`${textSize} font-medium text-heading`}>{label}</label>
         {'options' in field ? <select {...control} className={`${fieldClassName} w-full border px-3 text-sm text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
           <option value="">Selecione</option>
           {field.options.map(option => <option key={option}>{option}</option>)}
-        </select> : <textarea {...control} rows={3} placeholder={'placeholder' in field ? field.placeholder : undefined} className="w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-sm text-body placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" />}
+        </select> : <textarea {...control} rows={3} placeholder={'placeholder' in field ? field.placeholder : undefined} className={`w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 ${textSize} text-body placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`} />}
       </div> : <Input {...field} {...control} label={label} className={fieldClassName}
         onChange={event => {
           if (format) event.target.value = format(event.target.value);
