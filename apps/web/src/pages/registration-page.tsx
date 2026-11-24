@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Building2, Check, CircleHelp, GraduationCap, Stethoscope, User, Users } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { emptyBasicData, formatCep, formatCns, formatCpf, formatPhone, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
+import { allergyOptions, bloodTypes, emergencyFields, emergencyRelationships, emptyBasicData, formatCep, formatCns, formatCpf, formatPhone, genderOptions, raceOptions, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
 import { usePatientAddress } from './use-patient-address';
 
 const steps = ['Seleção', 'Dados básicos', 'Específicos', 'Revisão'];
@@ -27,15 +27,31 @@ const fields = {
   cns: { label: 'Cartão SUS (CNS)', placeholder: '000 0000 0000 0000', inputMode: 'numeric' },
   address: { label: 'Endereço completo', placeholder: 'Rua, número, bairro, cidade', autoComplete: 'street-address' },
   socialName: { label: 'Nome social' },
+  gender: { label: 'Identidade de gênero', options: genderOptions, optional: true },
+  race: { label: 'Raça/cor', options: raceOptions, optional: true },
+  bloodType: { label: 'Tipo sanguíneo', options: bloodTypes, optional: true },
+  hasAllergies: { label: 'Você tem alergias conhecidas?', options: allergyOptions, optional: true },
+  allergies: { label: 'Quais são as alergias?', optional: true, multiline: true },
+  healthConditions: { label: 'Condições de saúde importantes', optional: true, multiline: true },
+  emergencyName: { label: 'Nome e sobrenome do contato' },
+  emergencyPhone: { label: 'Telefone do contato', type: 'tel', placeholder: '(81) 90000-0000' },
+  emergencyRelationship: { label: 'Relação com o paciente', options: emergencyRelationships },
 } as const;
 const teamFields = ['name', 'cpf', 'birthDate', 'phone', 'email', 'address'] as const;
 const patientSections = [
-  { id: 'personal', title: 'Dados pessoais', fields: ['name', 'socialName', 'birthDate', 'cpf', 'cns'] },
+  { id: 'personal', title: 'Dados pessoais', fields: ['name', 'socialName', 'birthDate', 'gender', 'race', 'cpf', 'cns'] },
   { id: 'contact', title: 'Formas de contato', fields: ['email', 'phone'] },
   { id: 'address', title: 'Endereço', fields: ['cep', 'street', 'houseNumber', 'complement'] },
 ] as const;
+const specificSections = [
+  { id: 'health', title: 'Informações de saúde', fields: ['bloodType', 'hasAllergies', 'allergies', 'healthConditions'] },
+  { id: 'emergency', title: 'Contato de emergência', fields: emergencyFields },
+] as const;
+const patientBasicFields = [...patientSections.flatMap(section => [...section.fields]), 'usesSocialName'] as const;
+const fieldClassName = 'h-12 rounded-[1.25rem] border-line-strong bg-surface';
+const sectionClassName = 'mb-7 border-b border-line pb-7 last:mb-0 last:border-b-0 last:pb-0';
 const patientFormatters: Partial<Record<keyof BasicData, (value: string) => string>> = {
-  cpf: formatCpf, cep: formatCep, cns: formatCns, phone: formatPhone,
+  cpf: formatCpf, cep: formatCep, cns: formatCns, phone: formatPhone, emergencyPhone: formatPhone,
 };
 
 export function RegistrationPage() {
@@ -46,11 +62,13 @@ export function RegistrationPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [completed, setCompleted] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const { register, handleSubmit, watch, getValues, setValue, reset, formState: { errors } } = useForm<BasicData>({
+  const { register, handleSubmit, trigger, watch, getValues, setValue, reset, formState: { errors } } = useForm<BasicData>({
     resolver: zodResolver(registrationSchema(profile)), defaultValues: emptyBasicData, mode: 'onTouched',
   });
   const usesSocialName = watch('usesSocialName');
   const cep = watch('cep');
+  const hasAllergies = watch('hasAllergies');
+  const hasEmergencyContact = watch(emergencyFields).some(value => value.trim());
   const isPatient = profile === 'patient';
   const { message: cepMessage, markStreetEdited } = usePatientAddress(isPatient ? cep : '', getValues, setValue);
   const currentProfile = registrationProfiles.find(item => item.id === profile);
@@ -75,27 +93,49 @@ export function RegistrationPage() {
 
   const data = getValues();
 
-  function renderField(name: keyof typeof fields) {
+  async function advanceToSpecifics() {
+    if (await trigger(patientBasicFields, { shouldFocus: true })) goTo(2);
+  }
+
+  function goToInvalidStep(invalid: FieldErrors<BasicData>) {
+    goTo(isPatient && !patientBasicFields.some(name => invalid[name]) ? 2 : 1);
+  }
+
+  function renderField(name: keyof typeof fields, inEmergencySection = false) {
     const field = name === 'name' && isPatient
       ? { ...fields.name, label: 'Nome completo', placeholder: 'Como aparece no documento' }
       : fields[name];
-    const optional = name === 'complement';
+    const optional = name === 'complement' || 'optional' in field;
+    const required = inEmergencySection ? hasEmergencyContact : !optional;
+    const label = optional ? `${field.label} (opcional)` : `${field.label}${required ? ' *' : ''}`;
     const input = register(name);
     const format = isPatient ? patientFormatters[name] : undefined;
     const isCep = name === 'cep';
     const error = errors[name]?.message;
     const description = [error && `error-${name}`, isCep && 'cep-help', isCep && 'cep-result'].filter(Boolean).join(' ');
-    const fullWidth = name === 'address' || (isPatient && (name === 'name' || name === 'cns'));
+    const multiline = 'multiline' in field;
+    const fullWidth = multiline || name === 'address' || (isPatient && (name === 'name' || name === 'cns'));
+    const control = {
+      id: `registration-${name}`,
+      required,
+      'aria-invalid': !!error,
+      'aria-describedby': description || undefined,
+      ...input,
+    };
 
     return <div key={name} className={fullWidth ? 'sm:col-span-2' : ''}>
-      <Input {...field} id={`registration-${name}`} label={`${field.label} ${optional ? '(opcional)' : '*'}`} required={!optional}
-        className="h-12 rounded-[1.25rem] border-line-strong bg-surface"
-        aria-invalid={!!error} aria-describedby={description || undefined}
-        {...input} onChange={event => {
+      {'options' in field || multiline ? <div className="flex w-full flex-col gap-1.5">
+        <label htmlFor={control.id} className="text-sm font-medium text-heading">{label}</label>
+        {'options' in field ? <select {...control} className={`${fieldClassName} w-full border px-3 text-sm text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
+          <option value="">Selecione</option>
+          {field.options.map(option => <option key={option}>{option}</option>)}
+        </select> : <textarea {...control} rows={3} className="w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-sm text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" />}
+      </div> : <Input {...field} {...control} label={label} className={fieldClassName}
+        onChange={event => {
           if (format) event.target.value = format(event.target.value);
           if (name === 'street') markStreetEdited();
           void input.onChange(event);
-        }} />
+        }} />}
       {error && <p role="alert" id={`error-${name}`} className="mt-1 text-sm text-danger-text">{error}</p>}
       {isCep && <>
         <p id="cep-help" className="mt-1 text-sm text-muted">Usamos o ViaCEP para buscar a rua pelo CEP.</p>
@@ -121,11 +161,20 @@ export function RegistrationPage() {
     </fieldset>;
   }
 
+  function showField(name: keyof typeof fields) {
+    if (name === 'socialName') return usesSocialName === 'yes';
+    if (name === 'allergies') return hasAllergies === 'Sim';
+    return true;
+  }
+
+  function reviewFields(names: readonly (keyof typeof fields)[]) {
+    return names.filter(name => data[name].trim() && showField(name));
+  }
+
   function renderReviewFields(names: readonly (keyof typeof fields)[]) {
     return <dl className="grid gap-5 sm:grid-cols-2">
-      {names.map(name => {
+      {reviewFields(names).map(name => {
         const value = data[name].trim();
-        if (!value || (name === 'socialName' && usesSocialName !== 'yes')) return null;
         return <div key={name} className="min-w-0">
           <dt className="text-sm text-muted">{name === 'name' && isPatient ? 'Nome completo' : fields[name].label}</dt>
           <dd className="mt-1 break-words font-medium text-heading">{name === 'birthDate' ? value.split('-').reverse().join('/') : value}</dd>
@@ -161,7 +210,8 @@ export function RegistrationPage() {
           <ol className="grid grid-cols-4 gap-2">
             {steps.map((label, index) => <li key={label}>
               <button type="button" disabled={index > furthestStep || completed} onClick={() => {
-                if (index > step && index > 1) void handleSubmit(() => goTo(index), () => goTo(1))();
+                if (index === 2 && step === 1 && isPatient) void advanceToSpecifics();
+                else if (index > step && index > 1) void handleSubmit(() => goTo(index), goToInvalidStep)();
                 else goTo(index);
               }} aria-current={step === index ? 'step' : undefined} className="w-full rounded text-left text-xs disabled:cursor-default sm:text-sm">
                 <span className={`mb-2 block h-1.5 rounded-full ${index <= step ? 'bg-brand-primary' : 'bg-line'}`} />
@@ -181,7 +231,7 @@ export function RegistrationPage() {
             <p role="status">Você concluiu a simulação de cadastro. Nenhuma conta foi criada.</p>
             <Button onClick={() => { reset(emptyBasicData); setProfile(null); setGroup('patient'); setCompleted(false); setFurthestStep(0); goTo(0); }}>Iniciar novo cadastro</Button>
           </div> : <>
-            {!(step === 1 && isPatient) && <p className="mt-3 text-base text-muted sm:text-lg">{[
+            {!(isPatient && (step === 1 || step === 2)) && <p className="mt-3 text-base text-muted sm:text-lg">{[
               <>Escolha uma opção para começar. Se você vai receber atendimento, selecione <strong className="text-heading">Sou paciente.</strong></>,
               'Informações iniciais para identificar a conta no sistema.',
               'Confira o perfil escolhido antes de revisar as informações.',
@@ -221,10 +271,17 @@ export function RegistrationPage() {
               </div>
             </>}
 
-            {step === 1 && <form noValidate onSubmit={handleSubmit(() => goTo(2))} className="mt-8">
+            {step === 1 && <form noValidate onSubmit={event => {
+              if (isPatient) {
+                event.preventDefault();
+                void advanceToSpecifics();
+              } else {
+                void handleSubmit(() => goTo(2))(event);
+              }
+            }} className="mt-8">
               {isPatient ? <div className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
                 <p className="mb-5 text-sm text-muted">Campos com <strong>*</strong> são obrigatórios.</p>
-                {patientSections.map((section, index) => <section key={section.id} aria-labelledby={`basic-${section.id}`} className="mb-7 border-b border-line pb-7 last:mb-0 last:border-b-0 last:pb-0">
+                {patientSections.map((section, index) => <section key={section.id} aria-labelledby={`basic-${section.id}`} className={sectionClassName}>
                   <h2 id={`basic-${section.id}`} className="mb-4 text-xl font-semibold text-heading">{index + 1}. {section.title}</h2>
                   <div className="grid gap-5 sm:grid-cols-2">
                     {section.fields.map(name => name === 'socialName' ? renderSocialName() : renderField(name))}
@@ -233,7 +290,7 @@ export function RegistrationPage() {
               </div> : <section aria-label="Informações iniciais" className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Informações iniciais · {currentProfile?.label}</h2>
                 <p className="mb-5 mt-3 text-sm text-muted">Campos com <strong>*</strong> são obrigatórios.</p>
-                <div className="grid gap-5 sm:grid-cols-2">{teamFields.map(renderField)}</div>
+                <div className="grid gap-5 sm:grid-cols-2">{teamFields.map(name => renderField(name))}</div>
                 <div className="mt-7 space-y-6 border-t border-line pt-7">
                   <div><h2 className="text-xs font-bold uppercase tracking-widest text-accent-text">Identificação e acolhimento</h2><p className="mt-3 text-sm text-muted">Estas perguntas são opcionais. Você pode responder, escolher “Prefiro não informar” ou pular.</p></div>
                   {renderSocialName()}
@@ -242,20 +299,34 @@ export function RegistrationPage() {
               <div className="mt-8 flex flex-wrap items-center justify-between gap-4"><p className="text-sm text-muted">Perfil: {currentProfile?.label}</p><div className="flex gap-3"><Button type="button" variant="outline" className="rounded-full" onClick={() => goTo(0)}>Voltar</Button><Button type="submit" className="rounded-full">Próximo<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div></div>
             </form>}
 
-            {step === 2 && <div className="mt-8 space-y-6">
+            {step === 2 && (isPatient ? <form noValidate onSubmit={handleSubmit(() => goTo(3), goToInvalidStep)} className="mt-8 space-y-6">
+              <div className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
+                {specificSections.map((section, index) => <section key={section.id} aria-labelledby={`specific-${section.id}`} className={sectionClassName}>
+                  <h2 id={`specific-${section.id}`} className="mb-4 text-xl font-semibold text-heading">{index + 1}. {section.title}</h2>
+                  {section.id === 'emergency' && <p className="mb-4 text-sm text-muted">O contato de emergência é opcional. Se quiser indicar alguém, preencha os três campos.</p>}
+                  <div className="grid gap-5 sm:grid-cols-2">
+                    {section.fields.filter(showField).map(name => renderField(name, section.id === 'emergency'))}
+                  </div>
+                </section>)}
+              </div>
+              <div className="flex justify-between gap-3">
+                <Button type="button" variant="outline" className="rounded-full" onClick={() => goTo(1)}><ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />Voltar</Button>
+                <Button type="submit" className="rounded-full">Revisar dados<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button>
+              </div>
+            </form> : <div className="mt-8 space-y-6">
               <section className="rounded-3xl bg-accent-subtle p-7"><h2 className="text-xl font-semibold text-heading">{currentProfile?.label}</h2><p className="mt-3 leading-relaxed">Esta simulação coleta apenas os dados básicos. As informações específicas de cada perfil ainda não são solicitadas. Continue para revisar o que você preencheu.</p></section>
               <div className="flex justify-between gap-3"><Button variant="outline" className="rounded-full" onClick={() => goTo(1)}><ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />Voltar</Button><Button className="rounded-full" onClick={() => goTo(3)}>Revisar dados<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
-            </div>}
+            </div>)}
 
             {step === 3 && <div className="mt-8 space-y-6">
               <section className="rounded-3xl bg-accent-subtle p-7"><h2 className="mb-6 text-xl font-semibold text-heading">Perfil: {currentProfile?.label}</h2>
-                {isPatient ? patientSections.map(section => <section key={section.id} aria-labelledby={`review-${section.id}`} className="mb-6 border-b border-line pb-6 last:mb-0 last:border-b-0 last:pb-0">
+                {isPatient ? [...patientSections, ...specificSections].filter(section => reviewFields(section.fields).length > 0).map(section => <section key={section.id} aria-labelledby={`review-${section.id}`} className={sectionClassName}>
                   <h3 id={`review-${section.id}`} className="mb-4 text-lg font-semibold text-heading">{section.title}</h3>
                   {renderReviewFields(section.fields)}
                 </section>) : renderReviewFields([...teamFields, 'socialName'])}
               </section>
               <p className="text-sm text-muted">Ao concluir, você termina somente esta simulação.</p>
-              <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" className="rounded-full" onClick={() => goTo(2)}>Voltar</Button><Button className="rounded-full" onClick={handleSubmit(() => setCompleted(true), () => goTo(1))}>Concluir simulação<Check aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
+              <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" className="rounded-full" onClick={() => goTo(2)}>Voltar</Button><Button className="rounded-full" onClick={handleSubmit(() => setCompleted(true), goToInvalidStep)}>Concluir simulação<Check aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
             </div>}
           </>}
         </main>

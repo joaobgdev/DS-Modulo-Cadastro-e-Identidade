@@ -11,6 +11,17 @@ export const registrationProfiles = [
 export type RegistrationProfile = typeof registrationProfiles[number]['id'];
 
 const digits = (value: string) => value.replace(/\D/g, '');
+const isPhone = (value: string) => /^[\d\s()+-]+$/.test(value) && /^\d{10,11}$/.test(digits(value));
+
+export const genderOptions = ['Mulher', 'Homem', 'Pessoa não binária', 'Outra identidade de gênero', 'Prefiro não informar'] as const;
+export const raceOptions = ['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Prefiro não informar'] as const;
+export const bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Não sei'] as const;
+export const allergyOptions = ['Sim', 'Não', 'Não sei'] as const;
+export const emergencyRelationships = [
+  'Mãe', 'Pai', 'Cônjuge/companheiro(a)', 'Filho(a)', 'Irmão/irmã', 'Responsável legal', 'Amigo(a)', 'Outro',
+] as const;
+
+export const emergencyFields = ['emergencyName', 'emergencyPhone', 'emergencyRelationship'] as const;
 
 export function formatCpf(value: string) {
   return digits(value).slice(0, 11)
@@ -53,7 +64,7 @@ export const basicDataSchema = z.object({
       && `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` === value;
   }, 'Informe uma data válida que não esteja no futuro.'),
   phone: z.string().trim().min(1, 'Informe o telefone.').refine(
-    value => /^[\d\s()+-]+$/.test(value) && /^\d{10,11}$/.test(digits(value)),
+    isPhone,
     'Informe um telefone com DDD e 10 ou 11 dígitos.',
   ),
   email: z.string().trim().min(1, 'Informe o e-mail.').email('Informe um e-mail válido.'),
@@ -68,7 +79,19 @@ const teamDataSchema = basicDataSchema.extend({
   houseNumber: z.string(),
   complement: z.string(),
   cns: z.string(),
+  gender: z.string(),
+  race: z.string(),
+  bloodType: z.string(),
+  hasAllergies: z.string(),
+  allergies: z.string(),
+  healthConditions: z.string(),
+  emergencyName: z.string(),
+  emergencyPhone: z.string(),
+  emergencyRelationship: z.string(),
 });
+
+const optionalChoice = (options: readonly [string, ...string[]]) =>
+  z.enum(options, 'Selecione uma opção válida.').or(z.literal(''));
 
 const patientDataSchema = teamDataSchema.extend({
   address: z.string(),
@@ -80,6 +103,27 @@ const patientDataSchema = teamDataSchema.extend({
     value => /^\d{15}$/.test(value.replace(/ /g, '')),
     'Informe os 15 dígitos do Cartão SUS.',
   ),
+  gender: optionalChoice(genderOptions),
+  race: optionalChoice(raceOptions),
+  bloodType: optionalChoice(bloodTypes),
+  hasAllergies: optionalChoice(allergyOptions),
+  allergies: z.string().trim(),
+  healthConditions: z.string().trim(),
+  emergencyName: z.string().trim(),
+  emergencyPhone: z.string().trim(),
+  emergencyRelationship: optionalChoice(emergencyRelationships),
+}).superRefine((data, context) => {
+  if (!emergencyFields.some(field => data[field])) return;
+
+  if (data.emergencyName.split(/\s+/).length < 2) {
+    context.addIssue({ code: 'custom', path: ['emergencyName'], message: 'Informe o nome e o sobrenome do contato.' });
+  }
+  if (!isPhone(data.emergencyPhone)) {
+    context.addIssue({ code: 'custom', path: ['emergencyPhone'], message: 'Informe o telefone do contato com DDD e 10 ou 11 dígitos.' });
+  }
+  if (!data.emergencyRelationship) {
+    context.addIssue({ code: 'custom', path: ['emergencyRelationship'], message: 'Selecione a relação do contato com o paciente.' });
+  }
 });
 
 export const registrationSchema = (profile: RegistrationProfile | null) =>
@@ -90,4 +134,6 @@ export const emptyBasicData: BasicData = {
   name: '', cpf: '', birthDate: '', phone: '', email: '', address: '',
   cep: '', street: '', houseNumber: '', complement: '', cns: '',
   usesSocialName: '', socialName: '',
+  gender: '', race: '', bloodType: '', hasAllergies: '', allergies: '', healthConditions: '',
+  emergencyName: '', emergencyPhone: '', emergencyRelationship: '',
 };

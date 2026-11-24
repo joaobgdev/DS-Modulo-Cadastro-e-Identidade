@@ -81,7 +81,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
     await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
     fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
-    expect(screen.getByText('Mari')).toBeInTheDocument();
+    expect(await screen.findByText('Mari')).toBeInTheDocument();
     const reviewSections = ['Dados pessoais', 'Formas de contato', 'Endereço'];
     expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(reviewSections);
     expect(within(screen.getByRole('region', { name: 'Dados pessoais' })).getByText('012 3456 7890 1234')).toBeInTheDocument();
@@ -106,7 +106,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
     await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
     fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Concluir simulação' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Concluir simulação' }));
     await screen.findByRole('status');
     expect(screen.getByText(/Nenhuma conta foi criada/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar novo cadastro' }));
@@ -124,8 +124,8 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(personal.getAllByRole('radio').map(radio => radio.parentElement?.textContent))
       .toEqual(['Sim', 'Não', 'Prefiro não informar']);
     fireEvent.click(personal.getByRole('radio', { name: 'Sim' }));
-    expect(personal.getAllByLabelText(/Nome completo|Como você prefere|Data de nascimento|CPF|Cartão SUS/)
-      .map(input => input.getAttribute('name'))).toEqual(['name', 'socialName', 'birthDate', 'cpf', 'cns']);
+    expect(personal.getAllByLabelText(/Nome completo|Como você prefere|Data de nascimento|Identidade de gênero|Raça\/cor|CPF|Cartão SUS/)
+      .map(input => input.getAttribute('name'))).toEqual(['name', 'socialName', 'birthDate', 'gender', 'race', 'cpf', 'cns']);
     fireEvent.click(personal.getByRole('radio', { name: 'Não' }));
     expect(personal.queryByLabelText(/Como você prefere/)).toBeNull();
     for (const [name, expected] of [
@@ -135,6 +135,68 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
       expect(within(screen.getByRole('region', { name })).getAllByRole('textbox')
         .map(input => input.getAttribute('name'))).toEqual(expected);
     }
+  });
+
+  it('valida o contato de emergência em conjunto na etapa 3 e preserva as respostas na revisão e ao voltar', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(addressResponse({ logradouro: 'Rua das Flores' })));
+    openRegistration(); startPatient(); fillBasicData();
+    expect(screen.queryByText('Contato de emergência')).toBeNull();
+    expect(screen.queryByLabelText(/Tipo sanguíneo/)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Identidade de gênero/), { target: { value: 'Mulher' } });
+    fireEvent.change(screen.getByLabelText(/Raça\/cor/), { target: { value: 'Parda' } });
+    fireEvent.change(screen.getByLabelText(/Cartão SUS/), { target: { value: '123456789012345' } });
+    fireEvent.change(screen.getByLabelText(/CEP/), { target: { value: '50000000' } });
+    await waitFor(() => expect(screen.getByLabelText(/^Rua/)).toHaveValue('Rua das Flores'));
+    fireEvent.change(screen.getByLabelText(/^Número \*/), { target: { value: '15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
+
+    const health = within(await screen.findByRole('region', { name: '1. Informações de saúde' }));
+    const contact = within(screen.getByRole('region', { name: '2. Contato de emergência' }));
+    expect(screen.queryByLabelText(/Identidade de gênero/)).toBeNull();
+    expect(health.queryByLabelText(/Quais são as alergias/)).toBeNull();
+    fireEvent.change(health.getByLabelText(/Tipo sanguíneo/), { target: { value: 'O+' } });
+    fireEvent.change(health.getByLabelText(/alergias conhecidas/), { target: { value: 'Sim' } });
+    fireEvent.change(health.getByLabelText(/Quais são as alergias/), { target: { value: 'Alergia a látex' } });
+    fireEvent.change(health.getByLabelText(/Condições de saúde/), { target: { value: 'Asma' } });
+
+    fireEvent.change(contact.getByLabelText(/Nome e sobrenome/), { target: { value: 'Joana' } });
+    fireEvent.change(contact.getByLabelText(/Telefone do contato/), { target: { value: '81999' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+    expect(await contact.findAllByRole('alert')).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar' }));
+    expect(screen.getByLabelText(/Identidade de gênero/)).toHaveValue('Mulher');
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
+    await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
+    expect(screen.getByLabelText(/Quais são as alergias/)).toHaveValue('Alergia a látex');
+    expect(screen.getByLabelText(/Telefone do contato/)).toHaveValue('(81) 999');
+
+    fireEvent.change(screen.getByLabelText(/Nome e sobrenome/), { target: { value: 'Joana Silva' } });
+    fireEvent.change(screen.getByLabelText(/Telefone do contato/), { target: { value: '8188887777' } });
+    fireEvent.change(screen.getByLabelText(/Relação com o paciente/), { target: { value: 'Irmão/irmã' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+    const reviewContact = within(await screen.findByRole('region', { name: 'Contato de emergência' }));
+    for (const value of ['Joana Silva', '(81) 8888-7777', 'Irmão/irmã']) {
+      expect(reviewContact.getByText(value)).toBeInTheDocument();
+    }
+    const reviewHealth = within(screen.getByRole('region', { name: 'Informações de saúde' }));
+    for (const value of ['O+', 'Alergia a látex', 'Asma']) {
+      expect(reviewHealth.getByText(value)).toBeInTheDocument();
+    }
+    expect(within(screen.getByRole('region', { name: 'Dados pessoais' })).getByText('Parda')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar' }));
+    expect(screen.getByLabelText(/Telefone do contato/)).toHaveValue('(81) 8888-7777');
+    fireEvent.change(screen.getByLabelText(/alergias conhecidas/), { target: { value: 'Não' } });
+    expect(screen.queryByLabelText(/Quais são as alergias/)).toBeNull();
+    fireEvent.change(screen.getByLabelText(/Telefone do contato/), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: '4. Revisão' }));
+    await screen.findByText(/Informe o telefone do contato/);
+    expect(screen.getByRole('heading', { level: 1, name: 'Dados específicos' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Telefone do contato/), { target: { value: '8188887777' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+    await screen.findByRole('heading', { level: 1, name: 'Revise as informações' });
+    expect(screen.queryByText('Alergia a látex')).toBeNull();
   });
 
   it('formata telefone fixo e celular durante a digitação e a colagem', () => {
@@ -223,6 +285,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
     await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
     fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+    await screen.findByRole('heading', { level: 1, name: 'Revise as informações' });
     for (const value of ['Rua digitada', '12', 'Bloco A']) expect(screen.getByText(value)).toBeInTheDocument();
     expect(screen.getByText('123 4567 8901 2345')).toBeInTheDocument();
   });
@@ -239,6 +302,8 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
       fireEvent.change(screen.getByLabelText(/Endereço completo/), { target: { value: 'Rua das Flores, 10, Recife' } });
       fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
       await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
+      expect(screen.queryByText('Contato de emergência')).toBeNull();
+      expect(screen.queryByLabelText(/Tipo sanguíneo/)).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
       expect(screen.getByText('Rua das Flores, 10, Recife')).toBeInTheDocument();
     },
