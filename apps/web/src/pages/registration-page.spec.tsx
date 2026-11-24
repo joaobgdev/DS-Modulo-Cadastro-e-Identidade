@@ -2,12 +2,14 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../context/theme-context';
+import * as apiClient from '../lib/api-client';
 import { RegistrationPage } from './registration-page';
 import { basicDataSchema, emptyBasicData } from './registration-model';
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function addressResponse(data: { logradouro?: string; erro?: boolean | string }) {
@@ -290,7 +292,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(screen.getByText('123 4567 8901 2345')).toBeInTheDocument();
   });
 
-  it.each(['clínica', 'profissional administrativo', 'profissional de saúde', 'estudante / estagiário'])(
+  it.each(['clínica', 'profissional de saúde', 'estudante / estagiário'])(
     'mantém o endereço completo e a revisão para %s', async profile => {
       openRegistration();
       fireEvent.click(screen.getByRole('button', { name: 'Equipe e instituições' }));
@@ -308,6 +310,65 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
       expect(screen.getByText('Rua das Flores, 10, Recife')).toBeInTheDocument();
     },
   );
+
+  it('valida dados funcionais e cadastra profissional administrativo via API', async () => {
+    const createAdminSpy = vi.spyOn(apiClient, 'administrativeControllerCreate').mockResolvedValue({
+      status: 201,
+      headers: new Headers(),
+      data: {
+        id: '11111111-1111-1111-1111-111111111111',
+        userId: '22222222-2222-2222-2222-222222222222',
+        nome: 'Maria Silva',
+        email: 'maria@example.com',
+        role: 'ADMINISTRATIVO',
+        setor: 'FINANCEIRO',
+        cargo: 'Analista Administrativo',
+        matricula: 'ADM-0101',
+        turno: 'MANHA',
+        createdAt: '2026-11-24T12:00:00.000Z',
+        updatedAt: '2026-11-24T12:00:00.000Z',
+      },
+    }as never);
+
+    openRegistration();
+    fireEvent.click(screen.getByRole('button', { name: 'Equipe e instituições' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar profissional administrativo' }));
+    fillBasicData();
+    fireEvent.change(screen.getByLabelText(/Endereço completo/), { target: { value: 'Rua das Flores, 10, Recife' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
+
+    await screen.findByRole('heading', { level: 2, name: /Dados funcionais/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+    expect(await screen.findByText('Selecione o setor de atuação.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Setor de atuação/), { target: { value: 'FINANCEIRO' } });
+    fireEvent.change(screen.getByLabelText(/Cargo \/ Função/), { target: { value: 'Analista Administrativo' } });
+    fireEvent.change(screen.getByLabelText(/Matrícula institucional/), { target: { value: 'ADM-0101' } });
+    fireEvent.change(screen.getByLabelText(/Turno de trabalho/), { target: { value: 'MANHA' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+
+    await screen.findByRole('heading', { level: 1, name: 'Revise as informações' });
+    expect(screen.getByText('Rua das Flores, 10, Recife')).toBeInTheDocument();
+    expect(screen.getByText('Financeiro')).toBeInTheDocument();
+    expect(screen.getByText('Analista Administrativo')).toBeInTheDocument();
+    expect(screen.getByText('ADM-0101')).toBeInTheDocument();
+    expect(screen.getByText('Manhã')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cadastro' }));
+    await screen.findByRole('heading', { level: 1, name: 'Profissional administrativo cadastrado!' });
+    expect(createAdminSpy).toHaveBeenCalledWith({
+      nome: 'Maria Silva',
+      cpf: '12345678900',
+      nascimento: '2000-01-15',
+      telefone: '(81) 99999-9999',
+      email: 'maria@example.com',
+      endereco: 'Rua das Flores, 10, Recife',
+      setor: 'FINANCEIRO',
+      cargo: 'Analista Administrativo',
+      matricula: 'ADM-0101',
+      turno: 'MANHA',
+    });
+  });
 
   it('rejeita formatos inválidos e datas futuras, permitindo omitir respostas opcionais', () => {
     const valid = { ...emptyBasicData, name: 'Maria Silva', cpf: '12345678900', birthDate: '2000-01-15', phone: '81999999999', email: 'maria@example.com', address: 'Rua das Flores, Recife' };

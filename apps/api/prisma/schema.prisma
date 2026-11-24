@@ -10,20 +10,59 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
+  CLINICA
+  PACIENTE
+  ADMINISTRATIVO
+  SAUDE
+  ESTUDANTE
+}
+
+enum AdministrativeSector {
+  RECEPCAO
+  FATURAMENTO
+  FINANCEIRO
+  RH
+  SUPRIMENTOS
+}
+
+enum WorkShift {
+  MANHA
+  TARDE
+  NOITE
+  INTEGRAL
 }
 
 model UserProfile {
-  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keycloakUserId String    @unique
-  name           String
-  email          String    @unique
-  roleSnapshot   UserRole  @default(USER)
-  isActiveLocal  Boolean   @default(true)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  sessions       Session[]
+  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakUserId        String                 @unique
+  name                  String
+  email                 String                 @unique
+  cpf                   String?                @unique
+  birthDate             DateTime?              @db.Date
+  phone                 String?
+  address               String?
+  roleSnapshot          UserRole               @default(USER)
+  isActiveLocal         Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  sessions              Session[]
+  administrativeProfile AdministrativeProfile?
 
   @@map("user_profiles")
+}
+
+model AdministrativeProfile {
+  id            String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userProfileId String               @unique @db.Uuid
+  sector        AdministrativeSector
+  roleTitle     String
+  registration  String?              @unique
+  shift         WorkShift
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  userProfile   UserProfile          @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@map("administrative_profiles")
 }
 
 model Session {
@@ -40,4 +79,3 @@ model Session {
   @@index([expiresAt])
   @@map("sessions")
 }
-

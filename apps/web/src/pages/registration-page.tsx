@@ -6,13 +6,36 @@ import { ArrowLeft, ArrowRight, Building2, Check, CircleHelp, GraduationCap, Ste
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { ThemeToggle } from '../components/ui/theme-toggle';
-import { allergyOptions, bloodTypes, emergencyFields, emergencyRelationships, emptyBasicData, formatCep, formatCns, formatCpf, formatPhone, genderOptions, raceOptions, registrationProfiles, registrationSchema, type BasicData, type RegistrationProfile } from './registration-model';
+import { administrativeControllerCreate } from '../lib/api-client';
+import type { CreateAdministrativeUserDtoSetor, CreateAdministrativeUserDtoTurno } from '../lib/api-client/models';
+import {
+  administrativeSectors,
+  administrativeShifts,
+  administrativeSpecificFields,
+  allergyOptions,
+  bloodTypes,
+  emergencyFields,
+  emergencyRelationships,
+  emptyBasicData,
+  formatCep,
+  formatCns,
+  formatCpf,
+  formatPhone,
+  genderOptions,
+  raceOptions,
+  registrationProfiles,
+  registrationSchema,
+  type BasicData,
+  type RegistrationProfile,
+} from './registration-model';
 import { usePatientAddress } from './use-patient-address';
 
 const steps = ['Seleção', 'Dados básicos', 'Específicos', 'Revisão'];
 const stepDescriptions = ['Seleção de perfil', 'Informações iniciais', 'Dados do perfil', 'Confira seus dados'];
 const icons = { patient: User, clinic: Building2, administrative: Users, health: Stethoscope, student: GraduationCap };
 const answers = [{ value: 'yes', label: 'Sim' }, { value: 'no', label: 'Não' }, { value: 'undisclosed', label: 'Prefiro não informar' }] as const;
+
+type SelectOption = string | { readonly value: string; readonly label: string };
 
 const fields = {
   name: { label: 'Nome completo (como aparece na certidão de nascimento)', placeholder: 'Maria Silva', autoComplete: 'name' },
@@ -36,8 +59,14 @@ const fields = {
   emergencyName: { label: 'Nome e sobrenome do contato' },
   emergencyPhone: { label: 'Telefone do contato', type: 'tel', placeholder: '(81) 90000-0000' },
   emergencyRelationship: { label: 'Relação com o paciente', options: emergencyRelationships },
+  adminSector: { label: 'Setor de atuação', options: administrativeSectors },
+  adminRoleTitle: { label: 'Cargo / Função', placeholder: 'Ex.: Assistente Administrativo' },
+  adminRegistration: { label: 'Matrícula institucional', placeholder: 'Ex.: ADM-0101', optional: true },
+  adminShift: { label: 'Turno de trabalho', options: administrativeShifts },
 } as const;
+
 const teamFields = ['name', 'cpf', 'birthDate', 'phone', 'email', 'address'] as const;
+const teamBasicFields = [...teamFields, 'usesSocialName', 'socialName'] as const;
 const patientSections = [
   { id: 'personal', title: 'Dados pessoais', fields: ['name', 'socialName', 'birthDate', 'gender', 'race', 'cpf', 'cns'] },
   { id: 'contact', title: 'Formas de contato', fields: ['email', 'phone'] },
@@ -54,6 +83,16 @@ const patientFormatters: Partial<Record<keyof BasicData, (value: string) => stri
   cpf: formatCpf, cep: formatCep, cns: formatCns, phone: formatPhone, emergencyPhone: formatPhone,
 };
 
+function resolveOptionLabel(name: keyof typeof fields, rawValue: string): string {
+  const field = fields[name];
+  if (!('options' in field)) return rawValue;
+  const match = (field.options as readonly SelectOption[]).find(opt =>
+    typeof opt === 'string' ? opt === rawValue : opt.value === rawValue,
+  );
+  if (!match) return rawValue;
+  return typeof match === 'string' ? match : match.label;
+}
+
 export function RegistrationPage() {
   const [step, setStep] = useState(0);
   const [furthestStep, setFurthestStep] = useState(0);
@@ -61,6 +100,8 @@ export function RegistrationPage() {
   const [profile, setProfile] = useState<RegistrationProfile | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const { register, handleSubmit, trigger, watch, getValues, setValue, reset, formState: { errors } } = useForm<BasicData>({
     resolver: zodResolver(registrationSchema(profile)), defaultValues: emptyBasicData, mode: 'onTouched',
@@ -70,12 +111,14 @@ export function RegistrationPage() {
   const hasAllergies = watch('hasAllergies');
   const hasEmergencyContact = watch(emergencyFields).some(value => value.trim());
   const isPatient = profile === 'patient';
+  const isAdministrative = profile === 'administrative';
   const { message: cepMessage, markStreetEdited } = usePatientAddress(isPatient ? cep : '', getValues, setValue);
   const currentProfile = registrationProfiles.find(item => item.id === profile);
 
   function goTo(next: number) {
     setStep(next);
     setFurthestStep(previous => Math.max(previous, next));
+    setSubmitError(null);
     requestAnimationFrame(() => heading.current?.focus());
   }
 
@@ -86,7 +129,7 @@ export function RegistrationPage() {
     }
     setProfile(value);
     setCompleted(false);
-    // Revalida os dados básicos antes de permitir avançar novamente.
+    setSubmitError(null);
     setFurthestStep(1);
     goTo(1);
   }
@@ -94,11 +137,72 @@ export function RegistrationPage() {
   const data = getValues();
 
   async function advanceToSpecifics() {
-    if (await trigger(patientBasicFields, { shouldFocus: true })) goTo(2);
+    const fieldsToValidate = isPatient ? patientBasicFields : teamBasicFields;
+    if (await trigger(fieldsToValidate, { shouldFocus: true })) goTo(2);
   }
 
   function goToInvalidStep(invalid: FieldErrors<BasicData>) {
-    goTo(isPatient && !patientBasicFields.some(name => invalid[name]) ? 2 : 1);
+    if (isPatient) {
+      goTo(!patientBasicFields.some(name => invalid[name]) ? 2 : 1);
+      return;
+    }
+    if (isAdministrative) {
+      goTo(!teamBasicFields.some(name => invalid[name]) ? 2 : 1);
+      return;
+    }
+    goTo(1);
+  }
+
+  async function onSubmitRegistration(formData: BasicData) {
+    if (!isAdministrative) {
+      setCompleted(true);
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await administrativeControllerCreate({
+        nome: formData.name.trim(),
+        cpf: formData.cpf.replace(/\D/g, ''),
+        nascimento: formData.birthDate,
+        telefone: formData.phone.trim(),
+        email: formData.email.trim().toLowerCase(),
+        endereco: formData.address.trim(),
+        setor: formData.adminSector as CreateAdministrativeUserDtoSetor,
+        cargo: formData.adminRoleTitle.trim(),
+        matricula: formData.adminRegistration.trim() || undefined,
+        turno: formData.adminShift as CreateAdministrativeUserDtoTurno,
+      });
+
+      if (response.status === 201) {
+        setCompleted(true);
+        requestAnimationFrame(() => heading.current?.focus());
+        return;
+      }
+
+      const detail = (response.data as { detail?: string; message?: string })?.detail
+        ?? (response.data as { message?: string })?.message
+        ?? 'Não foi possível concluir o cadastro do profissional administrativo.';
+      setSubmitError(detail);
+    } catch (error) {
+      const err = error as {
+        status?: number;
+        detail?: string;
+        title?: string;
+        message?: string;
+        errors?: Record<string, string[]>;
+      };
+      if (err.status === 401 || err.status === 403) {
+        setSubmitError('Você precisa estar autenticado como Administrador ou Clínica para cadastrar um profissional administrativo.');
+      } else {
+        const firstFieldError = err.errors ? Object.values(err.errors).flat()[0] : undefined;
+        setSubmitError(firstFieldError ?? err.detail ?? err.title ?? err.message ?? 'Erro ao conectar com o servidor.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function renderField(name: keyof typeof fields, inEmergencySection = false) {
@@ -128,8 +232,12 @@ export function RegistrationPage() {
         <label htmlFor={control.id} className="text-base font-medium text-heading">{label}</label>
         {'options' in field ? <select {...control} className={`${fieldClassName} w-full border px-3 text-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`}>
           <option value="">Selecione</option>
-          {field.options.map(option => <option key={option}>{option}</option>)}
-        </select> : <textarea {...control} rows={3} placeholder={'placeholder' in field ? field.placeholder : undefined} className={`w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-base text-body placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring`} />}
+          {(field.options as readonly SelectOption[]).map(option => {
+            const optValue = typeof option === 'string' ? option : option.value;
+            const optLabel = typeof option === 'string' ? option : option.label;
+            return <option key={optValue} value={optValue}>{optLabel}</option>;
+          })}
+        </select> : <textarea {...control} rows={3} placeholder={'placeholder' in field ? field.placeholder : undefined} className="w-full rounded-[1.25rem] border border-line-strong bg-surface px-3 py-2 text-base text-body placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring" />}
       </div> : <Input {...field} {...control} label={label} className={fieldClassName}
         onChange={event => {
           if (format) event.target.value = format(event.target.value);
@@ -174,7 +282,7 @@ export function RegistrationPage() {
   function renderReviewFields(names: readonly (keyof typeof fields)[]) {
     return <dl className="grid gap-5 sm:grid-cols-2">
       {reviewFields(names).map(name => {
-        const value = data[name].trim();
+        const value = resolveOptionLabel(name, data[name].trim());
         return <div key={name} className="min-w-0">
           <dt className="text-base text-muted">{name === 'name' && isPatient ? 'Nome completo' : fields[name].label}</dt>
           <dd className="mt-1 break-words font-medium text-heading">{name === 'birthDate' ? value.split('-').reverse().join('/') : value}</dd>
@@ -201,7 +309,7 @@ export function RegistrationPage() {
           </div>
         </header>
 
-        {showHelp && <aside id="registration-help" className="mb-6 rounded-2xl border border-line bg-surface p-5 text-base">Escolha o perfil de quem será cadastrado. Preencha os campos com * e use Voltar para corrigir informações. Os dados do formulário são descartados ao recarregar ou sair desta página.</aside>}
+        {showHelp && <aside id="registration-help" className="mb-6 rounded-2xl border border-line bg-surface p-5 text-base">Escolha o perfil de quem será cadastrado. Preencha os campos com * e use Voltar para corrigir informações.</aside>}
 
         <nav aria-label="Etapas do cadastro" className="mb-7">
           <div className="mb-3 flex flex-wrap justify-between gap-x-4 gap-y-1 text-sm font-bold uppercase tracking-widest text-brand-text">
@@ -210,7 +318,7 @@ export function RegistrationPage() {
           <ol className="grid grid-cols-4 gap-2">
             {steps.map((label, index) => <li key={label}>
               <button type="button" disabled={index > furthestStep || completed} onClick={() => {
-                if (index === 2 && step === 1 && isPatient) void advanceToSpecifics();
+                if (index === 2 && step === 1 && (isPatient || isAdministrative)) void advanceToSpecifics();
                 else if (index > step && index > 1) void handleSubmit(() => goTo(index), goToInvalidStep)();
                 else goTo(index);
               }} aria-current={step === index ? 'step' : undefined} className="w-full rounded text-left text-sm disabled:cursor-default sm:text-base">
@@ -225,13 +333,22 @@ export function RegistrationPage() {
 
         <main className="rounded-[2rem] border border-line bg-surface p-5 shadow-sm sm:p-10">
           <h1 ref={heading} tabIndex={-1} className="break-words text-4xl font-bold leading-tight tracking-tight text-heading outline-none sm:text-[2.5rem]">
-            {completed ? 'Simulação concluída' : ['Quem você quer cadastrar?', isPatient ? 'Dados básicos' : 'Dados pessoais', 'Dados específicos', 'Revise as informações'][step]}
+            {completed
+              ? (isAdministrative ? 'Profissional administrativo cadastrado!' : 'Simulação concluída')
+              : ['Quem você quer cadastrar?', isPatient ? 'Dados básicos' : 'Dados pessoais', 'Dados específicos', 'Revise as informações'][step]}
           </h1>
           {completed ? <div className="mt-6 space-y-6">
-            <p role="status">Você concluiu a simulação de cadastro. Nenhuma conta foi criada.</p>
-            <Button size="lg" onClick={() => { reset(emptyBasicData); setProfile(null); setGroup('patient'); setCompleted(false); setFurthestStep(0); goTo(0); }}>Iniciar novo cadastro</Button>
+            <p role="status">
+              {isAdministrative
+                ? `O cadastro de ${data.name} (${data.email}) foi salvo no banco de dados e provisionado no Keycloak com o perfil Administrativo.`
+                : 'Você concluiu a simulação de cadastro. Nenhuma conta foi criada.'}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button size="lg" onClick={() => { reset(emptyBasicData); setProfile(null); setGroup('patient'); setCompleted(false); setFurthestStep(0); goTo(0); }}>Iniciar novo cadastro</Button>
+              {isAdministrative && <Link to="/users"><Button size="lg" variant="outline">Ver usuários cadastrados</Button></Link>}
+            </div>
           </div> : <>
-            {!(isPatient && (step === 1 || step === 2)) && <p className="mt-3 text-lg text-muted sm:text-xl">{[
+            {!((isPatient || isAdministrative) && (step === 1 || step === 2)) && <p className="mt-3 text-lg text-muted sm:text-xl">{[
               <>Escolha uma opção para começar. Se você vai receber atendimento, selecione <strong className="text-heading">Sou paciente.</strong></>,
               'Informações iniciais para identificar a conta no sistema.',
               'Confira o perfil escolhido antes de revisar as informações.',
@@ -272,7 +389,7 @@ export function RegistrationPage() {
             </>}
 
             {step === 1 && <form noValidate onSubmit={event => {
-              if (isPatient) {
+              if (isPatient || isAdministrative) {
                 event.preventDefault();
                 void advanceToSpecifics();
               } else {
@@ -313,6 +430,18 @@ export function RegistrationPage() {
                 <Button size="lg" type="button" variant="outline" className="rounded-full px-4 sm:px-6" onClick={() => goTo(1)}><ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />Voltar</Button>
                 <Button size="lg" type="submit" className="rounded-full px-4 sm:px-6">Revisar dados<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button>
               </div>
+            </form> : isAdministrative ? <form noValidate onSubmit={handleSubmit(() => goTo(3), goToInvalidStep)} className="mt-8 space-y-6">
+              <section aria-labelledby="specific-admin" className="rounded-3xl bg-accent-subtle p-5 sm:p-7">
+                <h2 id="specific-admin" className="mb-2 text-2xl font-semibold text-heading">Dados funcionais · Profissional administrativo</h2>
+                <p className="mb-5 text-base text-muted">Informe o setor, cargo e turno de atuação na clínica. Campos com <strong>*</strong> são obrigatórios.</p>
+                <div className="grid gap-5 sm:grid-cols-2">
+                  {administrativeSpecificFields.map(name => renderField(name))}
+                </div>
+              </section>
+              <div className="flex flex-wrap justify-between gap-3">
+                <Button size="lg" type="button" variant="outline" className="rounded-full px-4 sm:px-6" onClick={() => goTo(1)}><ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />Voltar</Button>
+                <Button size="lg" type="submit" className="rounded-full px-4 sm:px-6">Revisar dados<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button>
+              </div>
             </form> : <div className="mt-8 space-y-6">
               <section className="rounded-3xl bg-accent-subtle p-7"><h2 className="text-2xl font-semibold text-heading">{currentProfile?.label}</h2><p className="mt-3 leading-relaxed">Esta simulação coleta apenas os dados básicos. As informações específicas de cada perfil ainda não são solicitadas. Continue para revisar o que você preencheu.</p></section>
               <div className="flex flex-wrap justify-between gap-3"><Button size="lg" variant="outline" className="rounded-full px-4 sm:px-6" onClick={() => goTo(1)}><ArrowLeft aria-hidden="true" className="mr-2 h-4 w-4" />Voltar</Button><Button size="lg" className="rounded-full px-4 sm:px-6" onClick={() => goTo(3)}>Revisar dados<ArrowRight aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
@@ -323,16 +452,40 @@ export function RegistrationPage() {
                 {isPatient ? [...patientSections, ...specificSections].filter(section => reviewFields(section.fields).length > 0).map(section => <section key={section.id} aria-labelledby={`review-${section.id}`} className={sectionClassName}>
                   <h3 id={`review-${section.id}`} className="mb-4 text-xl font-semibold text-heading">{section.title}</h3>
                   {renderReviewFields(section.fields)}
-                </section>) : renderReviewFields([...teamFields, 'socialName'])}
+                </section>) : isAdministrative ? <>
+                  <section aria-labelledby="review-admin-personal" className={sectionClassName}>
+                    <h3 id="review-admin-personal" className="mb-4 text-xl font-semibold text-heading">Dados pessoais</h3>
+                    {renderReviewFields([...teamFields, 'socialName'])}
+                  </section>
+                  <section aria-labelledby="review-admin-functional" className={sectionClassName}>
+                    <h3 id="review-admin-functional" className="mb-4 text-xl font-semibold text-heading">Dados funcionais</h3>
+                    {renderReviewFields(administrativeSpecificFields)}
+                  </section>
+                </> : renderReviewFields([...teamFields, 'socialName'])}
               </section>
-              <p className="text-base text-muted">Ao concluir, você termina somente esta simulação.</p>
-              <div className="flex flex-wrap justify-between gap-3"><Button size="lg" variant="outline" className="rounded-full px-4 sm:px-6" onClick={() => goTo(2)}>Voltar</Button><Button size="lg" className="rounded-full px-4 sm:px-6" onClick={handleSubmit(() => setCompleted(true), goToInvalidStep)}>Concluir simulação<Check aria-hidden="true" className="ml-2 h-4 w-4" /></Button></div>
+              {submitError && (
+                <div role="alert" className="rounded-2xl border border-danger-text bg-surface p-4 text-base text-danger-text">
+                  {submitError}
+                </div>
+              )}
+              <p className="text-base text-muted">
+                {isAdministrative
+                  ? 'Ao confirmar, a conta será criada no sistema e vinculada ao perfil Administrativo.'
+                  : 'Ao concluir, você termina somente esta simulação.'}
+              </p>
+              <div className="flex flex-wrap justify-between gap-3">
+                <Button size="lg" variant="outline" disabled={submitting} className="rounded-full px-4 sm:px-6" onClick={() => goTo(2)}>Voltar</Button>
+                <Button size="lg" disabled={submitting} className="rounded-full px-4 sm:px-6" onClick={handleSubmit(onSubmitRegistration, goToInvalidStep)}>
+                  {submitting ? 'Cadastrando...' : isAdministrative ? 'Confirmar cadastro' : 'Concluir simulação'}
+                  <Check aria-hidden="true" className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </div>}
           </>}
         </main>
         <footer className="mt-6 space-y-2 text-center text-base leading-relaxed text-muted">
           <p>Diferentes contas possuem diferentes acessos e enxergam o sistema de maneira diferente.</p>
-          <p>Protótipo acadêmico · Clínica Digital UFPE · Nenhuma conta é criada nesta simulação.</p>
+          <p>Protótipo acadêmico · Clínica Digital UFPE</p>
         </footer>
       </div>
     </div>
