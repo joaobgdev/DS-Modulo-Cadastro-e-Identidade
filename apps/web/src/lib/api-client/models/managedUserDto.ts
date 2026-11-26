@@ -5,6 +5,7 @@
  * API REST do AppStart - Especificação OpenAPI 3.0
  * OpenAPI spec version: 1.0.0
  */
+import type { ManagedUserDtoRequestedRole } from './managedUserDtoRequestedRole';
 import type { ManagedUserDtoRole } from './managedUserDtoRole';
 
 export interface ManagedUserDto {
@@ -12,6 +13,8 @@ export interface ManagedUserDto {
   name: string;
   email: string;
   role: ManagedUserDtoRole;
+  /** @nullable */
+  requestedRole?: ManagedUserDtoRequestedRole;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

@@ -9,21 +9,19 @@ consulte o [catálogo de módulos](module-catalog.md) e o
 
 ## Cadastro no frontend (KAN-80 e KAN-81)
 
-A rota pública `/cadastro`, acessível pelo login, apresenta seleção de cinco
-perfis em dois grupos, dados básicos, uma etapa informativa para dados
-específicos e revisão. O estado vive somente na memória do componente:
-navegar entre etapas preserva valores, enquanto recarregar ou sair descarta
-o preenchimento. Nenhum dado pessoal vai para storage ou API.
+A rota pública `/cadastro` permite solicitar os perfis de paciente, clínica,
+profissional administrativo, profissional de saúde e estudante/estagiário.
+Todos os formulários seguem **dados pessoais → formas de contato → endereço**,
+com consulta de rua pelo CEP e uma etapa específica para cada perfil. A revisão
+solicita uma senha e sua confirmação; a senha é provisionada no Keycloak e não
+é persistida no PostgreSQL.
 
-O formulário utiliza React Hook Form e Zod para obrigatoriedade, formatos
-de CPF/telefone/e-mail e data de nascimento válida, sem datas futuras.
-CPF nesta etapa é validado por formato; dígitos verificadores e regras de
-responsável por menor pertencem às tarefas específicas de paciente.
-Os campos básicos seguem os prints fornecidos do paciente. Campos próprios
-dos demais perfis ainda precisam das respectivas referências e tarefas.
-A conclusão é explicitamente uma simulação: não cria conta nem permissões.
-Selecionar um perfil não altera o papel de autorização do usuário.
-A interface consome os tokens existentes, sem modificar `index.css`.
+Pacientes recebem acesso após o cadastro. Solicitações de clínica e equipe são
+persistidas como pendentes, com a identidade desativada e sem papel profissional,
+até aprovação de um Administrador em Gerenciamento de Usuários. Os dados
+específicos são armazenados em `ClinicProfile`, `AdministrativeProfile`,
+`HealthProfessionalProfile`, `StudentProfile` e `PatientProfile`. O estado do
+formulário permanece somente na memória até o envio.
 
 ## 0. Topologia do Shell e dos MFEs
 
@@ -112,16 +110,74 @@ sequenceDiagram
 erDiagram
     UserProfile ||--o{ Session : "possui"
     UserProfile ||--o{ Task : "é proprietário de"
+    UserProfile ||--o| PatientProfile : "dados do paciente"
+    UserProfile ||--o| ClinicProfile : "dados da clínica"
+    UserProfile ||--o| AdministrativeProfile : "dados administrativos"
+    UserProfile ||--o| HealthProfessionalProfile : "dados profissionais"
+    UserProfile ||--o| StudentProfile : "dados acadêmicos"
 
     UserProfile {
         uuid id PK
         string keycloakUserId UK
         string name
         string email UK
-        enum roleSnapshot "USER | ADMIN"
+        string postalCode
+        string street
+        string houseNumber
+        string addressComplement
+        enum roleSnapshot "papel efetivo"
+        enum requestedRole "papel aguardando aprovação"
         boolean isActiveLocal
         datetime createdAt
         datetime updatedAt
+    }
+
+    PatientProfile {
+        uuid id PK
+        uuid userProfileId FK
+        string cns UK
+        string gender
+        string race
+        string bloodType
+        string allergies
+        string healthConditions
+        string emergencyName
+        string emergencyPhone
+    }
+
+    ClinicProfile {
+        uuid id PK
+        uuid userProfileId FK
+        string tradeName
+        string cnpj UK
+        string cnes UK
+        enum facilityType
+        string specialties
+    }
+
+    AdministrativeProfile {
+        uuid id PK
+        uuid userProfileId FK
+        enum sector
+        string roleTitle
+        string registration UK
+        enum shift
+    }
+
+    HealthProfessionalProfile {
+        uuid id PK
+        uuid userProfileId FK
+        string professionalCouncil
+        string councilRegistration
+        string specialties
+    }
+
+    StudentProfile {
+        uuid id PK
+        uuid userProfileId FK
+        string institution
+        string course
+        string academicRegistration
     }
 
     Session {
@@ -165,10 +221,16 @@ erDiagram
 | `GET` | `/api/v1/admin/access-check` | Sessão | `ADMIN` | Verificação de privilégios administrativos |
 | `GET` | `/api/v1/users` | Sessão | `ADMIN` | Listagem paginada e filtrada de usuários |
 | `POST` | `/api/v1/users` | Sessão + CSRF | `ADMIN` | Provisiona novo usuário no Keycloak |
+| `POST` | `/api/v1/users/registrations` | Público | - | Cria conta de paciente ou solicita perfil sujeito à aprovação |
 | `GET` | `/api/v1/users/:id` | Sessão | `ADMIN` | Detalhes de um usuário específico |
 | `PATCH` | `/api/v1/users/:id` | Sessão + CSRF | `ADMIN` | Atualiza dados de um usuário |
 | `PATCH` | `/api/v1/users/:id/status` | Sessão + CSRF | `ADMIN` | Ativa ou desativa um usuário |
+| `POST` | `/api/v1/users/:id/approve` | Sessão + CSRF | `ADMIN` | Aprova a solicitação e libera o papel profissional |
 | `PATCH` | `/api/v1/users/me` | Sessão + CSRF | `USER` | Autoatendimento de perfil (nome) |
+| `POST` | `/api/v1/users/administrative` | Sessão + CSRF | `ADMIN` ou `CLINICA` | Registra profissional administrativo para aprovação |
+| `GET` | `/api/v1/users/administrative` | Sessão | `ADMIN` ou `CLINICA` | Lista profissionais administrativos |
+| `GET` | `/api/v1/users/administrative/:id` | Sessão | `ADMIN`, `CLINICA` ou `ADMINISTRATIVO` | Detalha perfil administrativo |
+| `POST` | `/api/v1/users/clinics` | Sessão + CSRF | `ADMIN` | Registra clínica para aprovação |
 | `GET` | `/api/v1/tasks` | Sessão | `USER` | Lista tarefas com paginação, busca e filtros |
 | `POST` | `/api/v1/tasks` | Sessão + CSRF | `USER` | Cria nova tarefa com ownership |
 | `GET` | `/api/v1/tasks/:id` | Sessão | `USER` | Detalhes da tarefa (owner ou admin) |

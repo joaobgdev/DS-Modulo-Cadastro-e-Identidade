@@ -17,7 +17,12 @@ try {
     roles: {
       realm: [
         { name: 'admin', description: 'Administrador da aplicação' },
-        { name: 'user', description: 'Usuário padrão da aplicação' }
+        { name: 'user', description: 'Usuário padrão da aplicação' },
+        { name: 'clinica', description: 'Clínica cadastrada na aplicação' },
+        { name: 'paciente', description: 'Paciente cadastrado na aplicação' },
+        { name: 'administrativo', description: 'Profissional administrativo cadastrado na aplicação' },
+        { name: 'saude', description: 'Profissional de saúde cadastrado na aplicação' },
+        { name: 'estudante', description: 'Estudante ou estagiário cadastrado na aplicação' }
       ]
     },
     groups: [

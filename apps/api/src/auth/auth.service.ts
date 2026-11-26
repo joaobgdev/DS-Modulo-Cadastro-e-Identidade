@@ -25,7 +25,7 @@ export class AuthService {
       throw new ConflictException('A identidade não pôde ser vinculada ao perfil local.');
     }
 
-    const roleSnapshot = identity.roles.includes('admin') ? UserRole.ADMIN : UserRole.USER;
+    const roleSnapshot = this.roleFromIdentity(identity.roles);
     const profile = await this.prisma.userProfile.upsert({
       where: { keycloakUserId: identity.subject },
       create: {
@@ -56,5 +56,20 @@ export class AuthService {
       email: profile.email,
       role: profile.roleSnapshot,
     };
+  }
+
+  private roleFromIdentity(roles: string[]): UserRole {
+    const roleSet = new Set(roles.map((role) => role.toLowerCase()));
+    const roleNames: Record<UserRole, string> = {
+      [UserRole.ADMIN]: 'admin',
+      [UserRole.USER]: 'user',
+      [UserRole.CLINICA]: 'clinica',
+      [UserRole.PACIENTE]: 'paciente',
+      [UserRole.ADMINISTRATIVO]: 'administrativo',
+      [UserRole.SAUDE]: 'saude',
+      [UserRole.ESTUDANTE]: 'estudante',
+    };
+    return (Object.entries(roleNames) as [UserRole, string][])
+      .find(([, roleName]) => roleSet.has(roleName))?.[0] ?? UserRole.USER;
   }
 }

@@ -114,4 +114,17 @@ export class UserController {
   ): Promise<ManagedUserDto> {
     return this.users.setActive(id, dto.isActive);
   }
+
+  @Post(':id/approve')
+  @Roles(UserRole.ADMIN)
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Aprovar solicitação de cadastro (ADMIN)' })
+  @ApiResponse({ status: 200, type: ManagedUserDto })
+  @ApiResponse({ status: 401, type: ProblemDetailsDto })
+  @ApiResponse({ status: 403, type: ProblemDetailsDto })
+  @ApiResponse({ status: 404, type: ProblemDetailsDto })
+  @ApiResponse({ status: 409, type: ProblemDetailsDto })
+  approve(@Param('id') id: string): Promise<ManagedUserDto> {
+    return this.users.approve(id);
+  }
 }

@@ -779,6 +779,134 @@
         ]
       }
     },
+    "/api/v1/users/{id}/approve": {
+      "post": {
+        "operationId": "UserController_approve",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedUserDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appstart_session": []
+          }
+        ],
+        "summary": "Aprovar solicitação de cadastro (ADMIN)",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/v1/users/registrations": {
+      "post": {
+        "operationId": "RegistrationController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Solicitar cadastro de um perfil",
+        "tags": [
+          "users"
+        ]
+      }
+    },
     "/api/v1/users/administrative": {
       "post": {
         "operationId": "AdministrativeController_create",
@@ -907,6 +1035,63 @@
         "summary": "Consultar dados funcionais de um profissional administrativo",
         "tags": [
           "administrative"
+        ]
+      }
+    },
+    "/api/v1/users/clinics": {
+      "post": {
+        "operationId": "ClinicController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateClinicUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClinicProfileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appstart_session": []
+          }
+        ],
+        "summary": "Cadastrar clínica",
+        "tags": [
+          "clinics"
         ]
       }
     }
@@ -1083,6 +1268,19 @@
             ],
             "example": "USER"
           },
+          "requestedRole": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
+            ],
+            "nullable": true
+          },
           "isActive": {
             "type": "boolean",
             "example": true
@@ -1238,6 +1436,238 @@
         },
         "required": [
           "isActive"
+        ]
+      },
+      "CreateRegistrationDto": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "type": "string",
+            "enum": [
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "example": "Maria Silva",
+            "maxLength": 160
+          },
+          "email": {
+            "type": "string",
+            "example": "maria@example.com",
+            "maxLength": 254
+          },
+          "cpf": {
+            "type": "string",
+            "example": "12345678901"
+          },
+          "birthDate": {
+            "type": "string",
+            "example": "2000-01-15",
+            "format": "date"
+          },
+          "phone": {
+            "type": "string",
+            "example": "(81) 99999-9999",
+            "maxLength": 20
+          },
+          "postalCode": {
+            "type": "string",
+            "example": "50000-000"
+          },
+          "street": {
+            "type": "string",
+            "example": "Rua das Flores",
+            "maxLength": 120
+          },
+          "houseNumber": {
+            "type": "string",
+            "example": "15",
+            "maxLength": 20
+          },
+          "addressComplement": {
+            "type": "string",
+            "example": "Apartamento 2",
+            "maxLength": 120
+          },
+          "password": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 12,
+            "maxLength": 128,
+            "writeOnly": true
+          },
+          "socialName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "cns": {
+            "type": "string",
+            "maxLength": 15
+          },
+          "gender": {
+            "type": "string"
+          },
+          "race": {
+            "type": "string"
+          },
+          "bloodType": {
+            "type": "string"
+          },
+          "hasAllergies": {
+            "type": "string"
+          },
+          "allergies": {
+            "type": "string"
+          },
+          "healthConditions": {
+            "type": "string"
+          },
+          "emergencyName": {
+            "type": "string"
+          },
+          "emergencyPhone": {
+            "type": "string"
+          },
+          "emergencyRelationship": {
+            "type": "string"
+          },
+          "adminSector": {
+            "type": "string",
+            "enum": [
+              "RECEPCAO",
+              "FATURAMENTO",
+              "FINANCEIRO",
+              "RH",
+              "SUPRIMENTOS"
+            ]
+          },
+          "adminRoleTitle": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "adminRegistration": {
+            "type": "string",
+            "maxLength": 30
+          },
+          "adminShift": {
+            "type": "string",
+            "enum": [
+              "MANHA",
+              "TARDE",
+              "NOITE",
+              "INTEGRAL"
+            ]
+          },
+          "clinicTradeName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "clinicCnpj": {
+            "type": "string",
+            "example": "11222333000181"
+          },
+          "clinicCnes": {
+            "type": "string",
+            "example": "1234567"
+          },
+          "clinicFacilityType": {
+            "type": "string",
+            "enum": [
+              "CLINICA_MEDICA",
+              "CLINICA_ODONTOLOGICA",
+              "LABORATORIO",
+              "HOSPITAL",
+              "POSTO_DE_SAUDE",
+              "OUTRO"
+            ]
+          },
+          "clinicSpecialties": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "healthCouncil": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "healthCouncilRegistration": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "healthSpecialties": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "studentInstitution": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "studentCourse": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "studentRegistration": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "required": [
+          "profile",
+          "name",
+          "email",
+          "phone",
+          "postalCode",
+          "street",
+          "houseNumber",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "RegistrationResponseDto": {
+        "type": "object",
+        "properties": {
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
+            ]
+          },
+          "requestedRole": {
+            "type": "string",
+            "enum": [
+              "USER",
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
+            ],
+            "nullable": true
+          }
+        },
+        "required": [
+          "isActive",
+          "role"
         ]
       },
       "CreateAdministrativeUserDto": {
@@ -1397,6 +1827,150 @@
           "setor",
           "cargo",
           "turno",
+          "isActive",
+          "createdAt"
+        ]
+      },
+      "CreateClinicUserDto": {
+        "type": "object",
+        "properties": {
+          "razaoSocial": {
+            "type": "string",
+            "example": "Clínica Saúde Recife",
+            "minLength": 2,
+            "maxLength": 160
+          },
+          "nomeFantasia": {
+            "type": "string",
+            "example": "Clínica Saúde",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "cnpj": {
+            "type": "string",
+            "example": "11222333000181",
+            "description": "CNPJ com 14 dígitos, sem pontuação."
+          },
+          "cnes": {
+            "type": "string",
+            "example": "1234567",
+            "description": "CNES opcional com 7 dígitos."
+          },
+          "tipoEstabelecimento": {
+            "type": "string",
+            "enum": [
+              "CLINICA_MEDICA",
+              "CLINICA_ODONTOLOGICA",
+              "LABORATORIO",
+              "HOSPITAL",
+              "POSTO_DE_SAUDE",
+              "OUTRO"
+            ],
+            "example": "CLINICA_MEDICA"
+          },
+          "especialidades": {
+            "type": "string",
+            "example": "Cardiologia, clínica geral",
+            "maxLength": 300
+          },
+          "telefone": {
+            "type": "string",
+            "example": "(81) 3333-4444",
+            "maxLength": 20
+          },
+          "email": {
+            "type": "string",
+            "example": "contato@clinicasaude.com.br",
+            "maxLength": 254
+          },
+          "endereco": {
+            "type": "string",
+            "example": "Av. Recife, 100, Recife",
+            "minLength": 5,
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "razaoSocial",
+          "nomeFantasia",
+          "cnpj",
+          "tipoEstabelecimento",
+          "telefone",
+          "email",
+          "endereco"
+        ]
+      },
+      "ClinicProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "razaoSocial": {
+            "type": "string",
+            "example": "Clínica Saúde Recife"
+          },
+          "nomeFantasia": {
+            "type": "string",
+            "example": "Clínica Saúde"
+          },
+          "cnpj": {
+            "type": "string",
+            "example": "11222333000181"
+          },
+          "cnes": {
+            "type": "object",
+            "example": "1234567",
+            "nullable": true
+          },
+          "tipoEstabelecimento": {
+            "type": "string",
+            "enum": [
+              "CLINICA_MEDICA",
+              "CLINICA_ODONTOLOGICA",
+              "LABORATORIO",
+              "HOSPITAL",
+              "POSTO_DE_SAUDE",
+              "OUTRO"
+            ],
+            "example": "CLINICA_MEDICA"
+          },
+          "especialidades": {
+            "type": "object",
+            "example": "Cardiologia, clínica geral",
+            "nullable": true
+          },
+          "telefone": {
+            "type": "string",
+            "example": "(81) 3333-4444"
+          },
+          "email": {
+            "type": "string",
+            "example": "contato@clinicasaude.com.br"
+          },
+          "endereco": {
+            "type": "string",
+            "example": "Av. Recife, 100, Recife"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-11-26T13:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "razaoSocial",
+          "nomeFantasia",
+          "cnpj",
+          "tipoEstabelecimento",
+          "telefone",
+          "email",
+          "endereco",
           "isActive",
           "createdAt"
         ]

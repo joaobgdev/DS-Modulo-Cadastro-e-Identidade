@@ -119,6 +119,9 @@ export class UserService {
 
   async setActive(id: string, isActive: boolean): Promise<ManagedUserDto> {
     const profile = await this.profile(id);
+    if (isActive && profile.requestedRole) {
+      throw new ConflictException('Aprove a solicitação antes de ativar o acesso do usuário.');
+    }
     const previous = await this.keycloak.setEnabled(profile.keycloakUserId, isActive);
     try {
       const operations = [
@@ -130,6 +133,31 @@ export class UserService {
       ];
       const [updated] = await this.prisma.$transaction(operations);
       return toManagedUser(updated as UserProfile);
+    } catch (error) {
+      await this.restore(previous);
+      this.throwPersistenceError(error);
+    }
+  }
+
+  async approve(id: string): Promise<ManagedUserDto> {
+    const profile = await this.profile(id);
+    if (!profile.requestedRole || profile.isActiveLocal) {
+      throw new ConflictException('Este usuário não possui uma solicitação pendente.');
+    }
+
+    const previous = await this.keycloak.getUserState(profile.keycloakUserId);
+    try {
+      await this.keycloak.updateUser(profile.keycloakUserId, { role: profile.requestedRole });
+      await this.keycloak.setEnabled(profile.keycloakUserId, true);
+      const updated = await this.prisma.userProfile.update({
+        where: { id },
+        data: {
+          roleSnapshot: profile.requestedRole,
+          requestedRole: null,
+          isActiveLocal: true,
+        },
+      });
+      return toManagedUser(updated);
     } catch (error) {
       await this.restore(previous);
       this.throwPersistenceError(error);

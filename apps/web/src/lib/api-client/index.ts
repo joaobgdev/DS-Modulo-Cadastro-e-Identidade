@@ -10,12 +10,16 @@ import type {
   AuthControllerCallbackParams,
   AuthControllerLoginParams,
   AuthMeResponseDto,
+  ClinicProfileResponseDto,
   CreateAdministrativeUserDto,
+  CreateClinicUserDto,
+  CreateRegistrationDto,
   CreateUserDto,
   LoginRequestDto,
   ManagedUserDto,
   PaginatedUsersResponseDto,
   ProblemDetailsDto,
+  RegistrationResponseDto,
   SetUserStatusDto,
   UpdateSelfUserDto,
   UpdateUserDto,
@@ -850,6 +854,126 @@ return customFetch<userControllerSetStatusResponse>(getUserControllerSetStatusUr
 
 
 
+export type userControllerApproveResponse200 = {
+  data: ManagedUserDto
+  status: 200
+}
+
+export type userControllerApproveResponse401 = {
+  data: ProblemDetailsDto
+  status: 401
+}
+
+export type userControllerApproveResponse403 = {
+  data: ProblemDetailsDto
+  status: 403
+}
+
+export type userControllerApproveResponse404 = {
+  data: ProblemDetailsDto
+  status: 404
+}
+
+export type userControllerApproveResponse409 = {
+  data: ProblemDetailsDto
+  status: 409
+}
+
+export type userControllerApproveResponseSuccess = (userControllerApproveResponse200) & {
+  headers: Headers;
+};
+export type userControllerApproveResponseError = (userControllerApproveResponse401 | userControllerApproveResponse403 | userControllerApproveResponse404 | userControllerApproveResponse409) & {
+  headers: Headers;
+};
+
+export type userControllerApproveResponse = (userControllerApproveResponseSuccess | userControllerApproveResponseError)
+
+export const getUserControllerApproveUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/users/${id}/approve`
+}
+
+/**
+ * @summary Aprovar solicitação de cadastro (ADMIN)
+ */
+export const userControllerApprove = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<userControllerApproveResponse> => {
+
+  return customFetch<userControllerApproveResponse>(getUserControllerApproveUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export type registrationControllerRegisterResponse201 = {
+  data: RegistrationResponseDto
+  status: 201
+}
+
+export type registrationControllerRegisterResponse400 = {
+  data: ProblemDetailsDto
+  status: 400
+}
+
+export type registrationControllerRegisterResponse409 = {
+  data: ProblemDetailsDto
+  status: 409
+}
+
+export type registrationControllerRegisterResponseSuccess = (registrationControllerRegisterResponse201) & {
+  headers: Headers;
+};
+export type registrationControllerRegisterResponseError = (registrationControllerRegisterResponse400 | registrationControllerRegisterResponse409) & {
+  headers: Headers;
+};
+
+export type registrationControllerRegisterResponse = (registrationControllerRegisterResponseSuccess | registrationControllerRegisterResponseError)
+
+export const getRegistrationControllerRegisterUrl = () => {
+
+
+
+
+  return `/api/v1/users/registrations`
+}
+
+/**
+ * @summary Solicitar cadastro de um perfil
+ */
+export const registrationControllerRegister = async (createRegistrationDto: CreateRegistrationDto, options?: Parameters<typeof customFetch>[1]): Promise<registrationControllerRegisterResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<registrationControllerRegisterResponse>(getRegistrationControllerRegisterUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createRegistrationDto)
+  }
+);}
+
+
+
 export type administrativeControllerCreateResponse201 = {
   data: AdministrativeProfileResponseDto
   status: 201
@@ -986,6 +1110,68 @@ export const administrativeControllerFindById = async (id: string, options?: Par
     method: 'GET'
 
 
+  }
+);}
+
+
+
+export type clinicControllerCreateResponse201 = {
+  data: ClinicProfileResponseDto
+  status: 201
+}
+
+export type clinicControllerCreateResponse400 = {
+  data: ProblemDetailsDto
+  status: 400
+}
+
+export type clinicControllerCreateResponse409 = {
+  data: ProblemDetailsDto
+  status: 409
+}
+
+export type clinicControllerCreateResponseSuccess = (clinicControllerCreateResponse201) & {
+  headers: Headers;
+};
+export type clinicControllerCreateResponseError = (clinicControllerCreateResponse400 | clinicControllerCreateResponse409) & {
+  headers: Headers;
+};
+
+export type clinicControllerCreateResponse = (clinicControllerCreateResponseSuccess | clinicControllerCreateResponseError)
+
+export const getClinicControllerCreateUrl = () => {
+
+
+
+
+  return `/api/v1/users/clinics`
+}
+
+/**
+ * @summary Cadastrar clínica
+ */
+export const clinicControllerCreate = async (createClinicUserDto: CreateClinicUserDto, options?: Parameters<typeof customFetch>[1]): Promise<clinicControllerCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<clinicControllerCreateResponse>(getClinicControllerCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createClinicUserDto)
   }
 );}
 

@@ -23,6 +23,7 @@ import {
   userControllerCreate,
   userControllerList,
   userControllerSetStatus,
+  userControllerApprove,
 } from '../lib/api-client';
 import type { ManagedUserDto, PaginatedUsersResponseDto } from '../lib/api-client/models';
 
@@ -86,6 +87,30 @@ export function UsersPage() {
         (err as { detail?: string })?.detail ||
         (err as { message?: string })?.message ||
         'Não foi possível atualizar o status do usuário.';
+      setFeedback({ type: 'error', message: msg });
+    },
+  });
+
+  const approvalMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await userControllerApprove(id);
+      return res.data;
+    },
+    onSuccess: (data) => {
+      const approvedUser = data && 'name' in (data as ManagedUserDto) ? (data as ManagedUserDto) : null;
+      setFeedback({
+        type: 'success',
+        message: approvedUser
+          ? `Solicitação de "${approvedUser.name}" aprovada. O acesso profissional foi liberado.`
+          : 'Solicitação aprovada.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    onError: (err: unknown) => {
+      const msg =
+        (err as { detail?: string })?.detail ||
+        (err as { message?: string })?.message ||
+        'Não foi possível aprovar a solicitação.';
       setFeedback({ type: 'error', message: msg });
     },
   });
@@ -269,41 +294,56 @@ export function UsersPage() {
                     <td className="py-3.5 px-4">
                       <Badge
                         variant={
-                          item.role === 'ADMIN' || item.role === 'ADMINISTRATIVO'
+                          item.requestedRole
+                            ? 'warning'
+                            : item.role === 'ADMIN' || item.role === 'ADMINISTRATIVO'
                             ? 'default'
                             : 'secondary'
                         }
                       >
-                        {item.role}
+                        {item.requestedRole ? `Solicitado: ${item.requestedRole}` : item.role}
                       </Badge>
                     </td>
                     <td className="py-3.5 px-4">
-                      <Badge variant={item.isActive ? 'success' : 'destructive'}>
-                        {item.isActive ? 'Ativo' : 'Inativo'}
+                      <Badge variant={item.requestedRole ? 'warning' : item.isActive ? 'success' : 'destructive'}>
+                        {item.requestedRole ? 'Aguardando aprovação' : item.isActive ? 'Ativo' : 'Inativo'}
                       </Badge>
                     </td>
                     <td className="py-3.5 px-4 text-right">
-                      <Button
-                        size="sm"
-                        variant={item.isActive ? 'outline' : 'secondary'}
-                        className="text-xs h-8 gap-1.5"
-                        isLoading={statusMutation.isPending && statusMutation.variables?.id === item.id}
-                        onClick={() =>
-                          statusMutation.mutate({ id: item.id, isActive: !item.isActive })
-                        }
-                      >
-                        {item.isActive ? (
-                          <>
-                            <UserX className="h-3.5 w-3.5 text-danger-text" />
-                            Desativar
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-3.5 w-3.5 text-success-text" />
-                            Ativar
-                          </>
-                        )}
-                      </Button>
+                      {item.requestedRole ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="text-xs h-8 gap-1.5"
+                          isLoading={approvalMutation.isPending && approvalMutation.variables === item.id}
+                          onClick={() => approvalMutation.mutate(item.id)}
+                        >
+                          <UserCheck className="h-3.5 w-3.5 text-success-text" />
+                          Aprovar perfil
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant={item.isActive ? 'outline' : 'secondary'}
+                          className="text-xs h-8 gap-1.5"
+                          isLoading={statusMutation.isPending && statusMutation.variables?.id === item.id}
+                          onClick={() =>
+                            statusMutation.mutate({ id: item.id, isActive: !item.isActive })
+                          }
+                        >
+                          {item.isActive ? (
+                            <>
+                              <UserX className="h-3.5 w-3.5 text-danger-text" />
+                              Desativar
+                            </>
+                          ) : (
+                            <>
+                              <UserCheck className="h-3.5 w-3.5 text-success-text" />
+                              Ativar
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}

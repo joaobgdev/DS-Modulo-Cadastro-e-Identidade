@@ -41,7 +41,18 @@ export const administrativeShifts = [
 ] as const;
 
 export const administrativeSpecificFields = ['adminSector', 'adminRoleTitle', 'adminRegistration', 'adminShift'] as const;
+export const clinicSpecificFields = ['clinicCnpj', 'clinicTradeName', 'clinicCnes', 'clinicFacilityType', 'clinicSpecialties'] as const;
+export const healthSpecificFields = ['healthCouncil', 'healthCouncilRegistration', 'healthSpecialties'] as const;
+export const studentSpecificFields = ['studentInstitution', 'studentCourse', 'studentRegistration'] as const;
 export const emergencyFields = ['emergencyName', 'emergencyPhone', 'emergencyRelationship'] as const;
+export const clinicFacilityTypes = [
+  { value: 'CLINICA_MEDICA', label: 'Clínica médica' },
+  { value: 'CLINICA_ODONTOLOGICA', label: 'Clínica odontológica' },
+  { value: 'LABORATORIO', label: 'Laboratório' },
+  { value: 'HOSPITAL', label: 'Hospital' },
+  { value: 'POSTO_DE_SAUDE', label: 'Posto de saúde' },
+  { value: 'OUTRO', label: 'Outro estabelecimento de saúde' },
+] as const;
 
 export function formatCpf(value: string) {
   return digits(value).slice(0, 11)
@@ -70,6 +81,27 @@ export function formatCns(value: string) {
     .filter(Boolean).join(' ');
 }
 
+export function formatCnpj(value: string) {
+  return digits(value).slice(0, 14)
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2}\.\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{2}\.\d{3}\.\d{3})(\d)/, '$1/$2')
+    .replace(/^(\d{2}\.\d{3}\.\d{3}\/\d{4})(\d)/, '$1-$2');
+}
+
+function isValidCnpj(value: string) {
+  const cnpj = digits(value);
+  if (!/^\d{14}$/.test(cnpj) || /^(\d)\1{13}$/.test(cnpj)) return false;
+  const digit = (base: string, weights: number[]) => {
+    const sum = [...base].reduce((total, current, index) => total + Number(current) * weights[index], 0);
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+  const first = digit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const second = digit(`${cnpj.slice(0, 12)}${first}`, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return cnpj.endsWith(`${first}${second}`);
+}
+
 export const basicDataSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome completo.').max(120, 'Use no máximo 120 caracteres.'),
   cpf: z.string().trim().min(1, 'Informe o CPF.').refine(
@@ -93,10 +125,13 @@ export const basicDataSchema = z.object({
 });
 
 const teamDataSchema = basicDataSchema.extend({
-  cep: z.string(),
-  street: z.string(),
-  houseNumber: z.string(),
-  complement: z.string(),
+  address: z.string(),
+  cep: z.string().regex(/^\d{5}-\d{3}$/, 'Informe um CEP com 8 dígitos.'),
+  street: z.string().trim().min(1, 'Informe a rua.'),
+  houseNumber: z.string().trim().min(1, 'Informe o número ou digite S/N.'),
+  complement: z.string().trim(),
+  password: z.string().min(12, 'A senha deve ter pelo menos 12 caracteres.').max(128, 'A senha deve ter no máximo 128 caracteres.'),
+  confirmPassword: z.string().min(1, 'Confirme sua senha.').max(128, 'A confirmação deve ter no máximo 128 caracteres.'),
   cns: z.string(),
   gender: z.string(),
   race: z.string(),
@@ -111,6 +146,17 @@ const teamDataSchema = basicDataSchema.extend({
   adminRoleTitle: z.string(),
   adminRegistration: z.string(),
   adminShift: z.string(),
+  clinicTradeName: z.string(),
+  clinicCnpj: z.string(),
+  clinicCnes: z.string(),
+  clinicFacilityType: z.string(),
+  clinicSpecialties: z.string(),
+  healthCouncil: z.string(),
+  healthCouncilRegistration: z.string(),
+  healthSpecialties: z.string(),
+  studentInstitution: z.string(),
+  studentCourse: z.string(),
+  studentRegistration: z.string(),
 });
 
 const administrativeDataSchema = teamDataSchema.extend({
@@ -137,15 +183,37 @@ const administrativeDataSchema = teamDataSchema.extend({
   ),
 });
 
+const clinicDataSchema = teamDataSchema.extend({
+  name: z.string().trim().min(2, 'Informe a razão social.').max(160, 'Use no máximo 160 caracteres.'),
+  cpf: z.string(),
+  birthDate: z.string(),
+  clinicTradeName: z.string().trim().min(2, 'Informe o nome fantasia.').max(120, 'Use no máximo 120 caracteres.'),
+  clinicCnpj: z.string().refine(isValidCnpj, 'Informe um CNPJ válido com 14 dígitos.'),
+  clinicCnes: z.string().refine(value => !value || /^\d{7}$/.test(digits(value)), 'Informe um CNES com 7 dígitos.'),
+  clinicFacilityType: z.enum(
+    ['CLINICA_MEDICA', 'CLINICA_ODONTOLOGICA', 'LABORATORIO', 'HOSPITAL', 'POSTO_DE_SAUDE', 'OUTRO'],
+    { message: 'Selecione o tipo de estabelecimento.' },
+  ),
+  clinicSpecialties: z.string().trim().max(300, 'Use no máximo 300 caracteres.'),
+});
+
+const healthDataSchema = teamDataSchema.extend({
+  healthCouncil: z.string().trim().min(2, 'Informe o conselho profissional.').max(40),
+  healthCouncilRegistration: z.string().trim().min(2, 'Informe o número do registro profissional.').max(40),
+  healthSpecialties: z.string().trim().max(300, 'Use no máximo 300 caracteres.'),
+});
+
+const studentDataSchema = teamDataSchema.extend({
+  studentInstitution: z.string().trim().min(2, 'Informe a instituição de ensino.').max(160),
+  studentCourse: z.string().trim().min(2, 'Informe o curso.').max(120),
+  studentRegistration: z.string().trim().min(2, 'Informe a matrícula acadêmica.').max(40),
+});
+
 const optionalChoice = (options: readonly [string, ...string[]]) =>
   z.enum(options, 'Selecione uma opção válida.').or(z.literal(''));
 
 const patientDataSchema = teamDataSchema.extend({
   address: z.string(),
-  cep: z.string().regex(/^\d{5}-\d{3}$/, 'Informe um CEP com 8 dígitos.'),
-  street: z.string().trim().min(1, 'Informe a rua.'),
-  houseNumber: z.string().trim().min(1, 'Informe o número ou digite S/N.'),
-  complement: z.string().trim(),
   cns: z.string().refine(
     value => /^\d{15}$/.test(value.replace(/ /g, '')),
     'Informe os 15 dígitos do Cartão SUS.',
@@ -173,18 +241,36 @@ const patientDataSchema = teamDataSchema.extend({
   }
 });
 
+function withPasswordConfirmation<T extends z.ZodType<{ password: string; confirmPassword: string }>>(schema: T) {
+  return schema.superRefine((data, context) => {
+    if (data.password && data.confirmPassword && data.password !== data.confirmPassword) {
+      context.addIssue({
+        code: 'custom',
+        path: ['confirmPassword'],
+        message: 'A confirmação de senha não corresponde.',
+      });
+    }
+  });
+}
+
 export const registrationSchema = (profile: RegistrationProfile | null) => {
-  if (profile === 'patient') return patientDataSchema;
-  if (profile === 'administrative') return administrativeDataSchema;
-  return teamDataSchema;
+  if (profile === 'patient') return withPasswordConfirmation(patientDataSchema);
+  if (profile === 'administrative') return withPasswordConfirmation(administrativeDataSchema);
+  if (profile === 'clinic') return withPasswordConfirmation(clinicDataSchema);
+  if (profile === 'health') return withPasswordConfirmation(healthDataSchema);
+  if (profile === 'student') return withPasswordConfirmation(studentDataSchema);
+  return withPasswordConfirmation(teamDataSchema);
 };
 
 export type BasicData = z.infer<typeof teamDataSchema>;
 export const emptyBasicData: BasicData = {
   name: '', cpf: '', birthDate: '', phone: '', email: '', address: '',
-  cep: '', street: '', houseNumber: '', complement: '', cns: '',
+  cep: '', street: '', houseNumber: '', complement: '', password: '', confirmPassword: '', cns: '',
   usesSocialName: '', socialName: '',
   gender: '', race: '', bloodType: '', hasAllergies: '', allergies: '', healthConditions: '',
   emergencyName: '', emergencyPhone: '', emergencyRelationship: '',
   adminSector: '', adminRoleTitle: '', adminRegistration: '', adminShift: '',
+  clinicTradeName: '', clinicCnpj: '', clinicCnes: '', clinicFacilityType: '', clinicSpecialties: '',
+  healthCouncil: '', healthCouncilRegistration: '', healthSpecialties: '',
+  studentInstitution: '', studentCourse: '', studentRegistration: '',
 };

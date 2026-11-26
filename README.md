@@ -152,6 +152,12 @@ Perfil - E-mail - Senha
 Administrador - `admin@appstart.local` - `ChangeMe123456!`
 Usuário comum - `user@appstart.local` - `ChangeMe123456!`
 
+### Cadastro de clínicas
+
+Na tela de cadastro, qualquer pessoa pode solicitar um perfil de paciente, clínica, profissional administrativo, profissional de saúde ou estudante/estagiário. Todos os formulários seguem a sequência **dados pessoais → formas de contato → endereço** e consultam a rua pelo CEP. A etapa de revisão pede uma senha e sua confirmação; a senha é enviada diretamente ao Keycloak e não é persistida no PostgreSQL.
+
+Contas de paciente são ativadas após o cadastro. Solicitações de clínica e de profissionais ficam desativadas, sem o papel profissional, até que um Administrador as aprove em **Gerenciamento de Usuários**. A solicitação de clínica inclui razão social, nome fantasia, CNPJ e tipo de estabelecimento (CNES e especialidades são opcionais); o profissional administrativo informa setor, cargo e turno; o profissional de saúde informa conselho e registro; estudantes informam instituição, curso e matrícula acadêmica. E-mail, CPF, CNS, CNPJ e CNES são validados e não podem ser reutilizados.
+
 ### Como encerrar o programa
 
 1. No terminal onde o `pnpm dev` está rodando, aperte `Ctrl+C`.
