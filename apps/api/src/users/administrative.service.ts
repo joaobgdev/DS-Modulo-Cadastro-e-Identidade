@@ -36,7 +36,8 @@ export class AdministrativeService {
     const keycloakUserId = await this.keycloak.createUser({
       name: dto.nome,
       email: dto.email,
-      role: UserRole.ADMINISTRATIVO,
+      role: UserRole.USER,
+      enabled: false,
     });
 
     try {
@@ -49,8 +50,9 @@ export class AdministrativeService {
           birthDate: new Date(`${dto.nascimento}T00:00:00.000Z`),
           phone: dto.telefone,
           address: dto.endereco,
-          roleSnapshot: UserRole.ADMINISTRATIVO,
-          isActiveLocal: true,
+          roleSnapshot: UserRole.USER,
+          requestedRole: UserRole.ADMINISTRATIVO,
+          isActiveLocal: false,
           administrativeProfile: {
             create: {
               sector: dto.setor,

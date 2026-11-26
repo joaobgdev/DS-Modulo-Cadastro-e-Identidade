@@ -26,10 +26,16 @@ function startPatient() {
 
 function fillBasicData() {
   for (const [label, value] of [
-    [/Nome completo/, 'Maria Silva'], [/CPF/, '123.456.789-00'],
+    [/Nome completo/, 'Maria Silva'], [/CPF/, '529.982.247-25'],
     [/Data de nascimento/, '2000-01-15'], [/Telefone \/ WhatsApp/, '(81) 99999-9999'],
     [/E-mail/, 'maria@example.com'],
   ] as const) fireEvent.change(screen.getByLabelText(label), { target: { value } });
+}
+
+function fillAddress() {
+  fireEvent.change(screen.getByLabelText(/CEP/), { target: { value: '50000000' } });
+  fireEvent.change(screen.getByLabelText(/^Rua/), { target: { value: 'Rua das Flores' } });
+  fireEvent.change(screen.getByLabelText(/^Número \*/), { target: { value: '10' } });
 }
 
 describe('Cadastro — KAN-80 e KAN-81', () => {
@@ -56,9 +62,14 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Dados básicos' })).toBeInTheDocument();
   });
 
-  it('preserva valores, valida atalhos de etapas e permite concluir somente a simulação', async () => {
+  it('preserva valores, valida etapas, confirma a senha e cria a conta do paciente', async () => {
     const fetchAddress = vi.fn().mockResolvedValue(addressResponse({ logradouro: 'Rua das Flores' }));
     vi.stubGlobal('fetch', fetchAddress);
+    const registrationSpy = vi.spyOn(apiClient, 'registrationControllerRegister').mockResolvedValue({
+      status: 201,
+      headers: new Headers(),
+      data: { isActive: true, role: 'PACIENTE', requestedRole: null },
+    } as never);
     openRegistration(); startPatient(); fillBasicData();
     fireEvent.change(screen.getByLabelText(/CEP/), { target: { value: '50000000' } });
     expect(screen.getByLabelText(/CEP/)).toHaveValue('50000-000');
@@ -88,7 +99,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(screen.getAllByRole('heading', { level: 3 }).map(heading => heading.textContent)).toEqual(reviewSections);
     expect(within(screen.getByRole('region', { name: 'Dados pessoais' })).getByText('012 3456 7890 1234')).toBeInTheDocument();
     expect(within(screen.getByRole('region', { name: 'Formas de contato' })).getByText('(81) 99999-9999')).toBeInTheDocument();
-    for (const value of ['50000-000', 'Rua das Flores Nova', 'S/N', '123.456.789-00']) {
+    for (const value of ['50000-000', 'Rua das Flores Nova', 'S/N', '529.982.247-25']) {
       expect(screen.getByText(value)).toBeInTheDocument();
     }
     expect(screen.queryByText('Complemento')).toBeNull();
@@ -98,7 +109,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(screen.getByLabelText(/^Número \*/)).toHaveValue('S/N');
     expect(screen.getByLabelText(/Cartão SUS/)).toHaveValue('012 3456 7890 1234');
     expect(screen.getByLabelText(/Telefone/)).toHaveValue('(81) 99999-9999');
-    expect(screen.getByLabelText(/CPF/)).toHaveValue('123.456.789-00');
+    expect(screen.getByLabelText(/CPF/)).toHaveValue('529.982.247-25');
     expect(screen.getByLabelText(/Como você prefere/)).toHaveValue('Mari');
     fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'invalido' } });
     fireEvent.click(screen.getByRole('button', { name: '4. Revisão' }));
@@ -108,9 +119,25 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
     await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
     fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Concluir simulação' }));
+    await screen.findByRole('heading', { level: 1, name: 'Revise as informações' });
+    fireEvent.change(screen.getByLabelText(/Senha/), { target: { value: 'uma-senha-segura-123' } });
+    fireEvent.change(screen.getByLabelText(/Confirme a senha/), { target: { value: 'senha-diferente-456' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Criar conta' }));
+    expect(await screen.findByText('A confirmação de senha não corresponde.')).toBeInTheDocument();
+    expect(registrationSpy).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText(/Confirme a senha/), { target: { value: 'uma-senha-segura-123' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'Criar conta' }));
     await screen.findByRole('status');
-    expect(screen.getByText(/Nenhuma conta foi criada/)).toBeInTheDocument();
+    expect(screen.getByText(/já pode ser usada para acessar o sistema/)).toBeInTheDocument();
+    expect(registrationSpy).toHaveBeenCalledWith(expect.objectContaining({
+      profile: 'PACIENTE',
+      cpf: '52998224725',
+      password: 'uma-senha-segura-123',
+      confirmPassword: 'uma-senha-segura-123',
+      postalCode: '50000000',
+      street: 'Rua das Flores Nova',
+      houseNumber: 'S/N',
+    }));
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar novo cadastro' }));
     startPatient();
     expect(screen.getByLabelText(/Nome completo/)).toHaveValue('');
@@ -292,41 +319,47 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     expect(screen.getByText('123 4567 8901 2345')).toBeInTheDocument();
   });
 
-  it.each(['clínica', 'profissional de saúde', 'estudante / estagiário'])(
-    'mantém o endereço completo e a revisão para %s', async profile => {
+  it.each(['profissional de saúde', 'estudante / estagiário'])(
+    'mantém endereço CEP e dados específicos na revisão para %s', async profile => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(addressResponse({ logradouro: 'Rua das Flores' })));
       openRegistration();
       fireEvent.click(screen.getByRole('button', { name: 'Equipe e instituições' }));
       fireEvent.click(screen.getByRole('button', { name: `Selecionar ${profile}` }));
       fillBasicData();
       fireEvent.change(screen.getByLabelText(/Telefone/), { target: { value: '81999999999' } });
-      expect(screen.getByLabelText(/Telefone/)).toHaveValue('81999999999');
-      expect(screen.queryByLabelText(/CEP|Cartão SUS/)).toBeNull();
-      fireEvent.change(screen.getByLabelText(/Endereço completo/), { target: { value: 'Rua das Flores, 10, Recife' } });
+      expect(screen.getByLabelText(/Telefone/)).toHaveValue('(81) 99999-9999');
+      expect(screen.getByLabelText(/CEP/)).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Cartão SUS/)).toBeNull();
+      fillAddress();
       fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
       await screen.findByRole('heading', { level: 1, name: 'Dados específicos' });
       expect(screen.queryByText('Contato de emergência')).toBeNull();
       expect(screen.queryByLabelText(/Tipo sanguíneo/)).toBeNull();
+      if (profile === 'profissional de saúde') {
+        fireEvent.change(screen.getByLabelText(/Conselho profissional/), { target: { value: 'COREN' } });
+        fireEvent.change(screen.getByLabelText(/Número de registro profissional/), { target: { value: '123456-PE' } });
+      } else {
+        fireEvent.change(screen.getByLabelText(/Instituição de ensino/), { target: { value: 'UFPE' } });
+        fireEvent.change(screen.getByLabelText(/^Curso/), { target: { value: 'Enfermagem' } });
+        fireEvent.change(screen.getByLabelText(/Matrícula acadêmica/), { target: { value: '20260001' } });
+      }
       fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
-      expect(screen.getByText('Rua das Flores, 10, Recife')).toBeInTheDocument();
+      expect(await screen.findByText('Rua das Flores')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
+      if (profile === 'profissional de saúde') expect(screen.getByText('COREN')).toBeInTheDocument();
+      else expect(screen.getByText('UFPE')).toBeInTheDocument();
     },
   );
 
   it('valida dados funcionais e cadastra profissional administrativo via API', async () => {
-    const createAdminSpy = vi.spyOn(apiClient, 'administrativeControllerCreate').mockResolvedValue({
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(addressResponse({ logradouro: 'Rua das Flores' })));
+    const createAdminSpy = vi.spyOn(apiClient, 'registrationControllerRegister').mockResolvedValue({
       status: 201,
       headers: new Headers(),
       data: {
-        id: '11111111-1111-1111-1111-111111111111',
-        userId: '22222222-2222-2222-2222-222222222222',
-        nome: 'Maria Silva',
-        email: 'maria@example.com',
-        role: 'ADMINISTRATIVO',
-        setor: 'FINANCEIRO',
-        cargo: 'Analista Administrativo',
-        matricula: 'ADM-0101',
-        turno: 'MANHA',
-        createdAt: '2026-11-24T12:00:00.000Z',
-        updatedAt: '2026-11-24T12:00:00.000Z',
+        isActive: false,
+        role: 'USER',
+        requestedRole: 'ADMINISTRATIVO',
       },
     }as never);
 
@@ -334,7 +367,7 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Equipe e instituições' }));
     fireEvent.click(screen.getByRole('button', { name: 'Selecionar profissional administrativo' }));
     fillBasicData();
-    fireEvent.change(screen.getByLabelText(/Endereço completo/), { target: { value: 'Rua das Flores, 10, Recife' } });
+    fillAddress();
     fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
 
     await screen.findByRole('heading', { level: 2, name: /Dados funcionais/ });
@@ -348,27 +381,84 @@ describe('Cadastro — KAN-80 e KAN-81', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
 
     await screen.findByRole('heading', { level: 1, name: 'Revise as informações' });
-    expect(screen.getByText('Rua das Flores, 10, Recife')).toBeInTheDocument();
+    expect(screen.getByText('Rua das Flores')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
     expect(screen.getByText('Financeiro')).toBeInTheDocument();
     expect(screen.getByText('Analista Administrativo')).toBeInTheDocument();
     expect(screen.getByText('ADM-0101')).toBeInTheDocument();
     expect(screen.getByText('Manhã')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Confirmar cadastro' }));
-    await screen.findByRole('heading', { level: 1, name: 'Profissional administrativo cadastrado!' });
-    expect(createAdminSpy).toHaveBeenCalledWith({
-      nome: 'Maria Silva',
-      cpf: '12345678900',
-      nascimento: '2000-01-15',
-      telefone: '(81) 99999-9999',
+    fireEvent.change(screen.getByLabelText(/Senha/), { target: { value: 'uma-senha-segura-123' } });
+    fireEvent.change(screen.getByLabelText(/Confirme a senha/), { target: { value: 'uma-senha-segura-123' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitação' }));
+    await screen.findByRole('heading', { level: 1, name: 'Solicitação enviada!' });
+    expect(screen.getByText(/após aprovação de um Administrador/)).toBeInTheDocument();
+    expect(createAdminSpy).toHaveBeenCalledWith(expect.objectContaining({
+      profile: 'ADMINISTRATIVO',
+      name: 'Maria Silva',
+      cpf: '52998224725',
+      birthDate: '2000-01-15',
+      phone: '(81) 99999-9999',
       email: 'maria@example.com',
-      endereco: 'Rua das Flores, 10, Recife',
-      setor: 'FINANCEIRO',
-      cargo: 'Analista Administrativo',
-      matricula: 'ADM-0101',
-      turno: 'MANHA',
-    });
+      postalCode: '50000000',
+      street: 'Rua das Flores',
+      houseNumber: '10',
+      adminSector: 'FINANCEIRO',
+      adminRoleTitle: 'Analista Administrativo',
+      adminRegistration: 'ADM-0101',
+      adminShift: 'MANHA',
+      password: 'uma-senha-segura-123',
+    }));
   });
+
+  it('valida os dados específicos e cadastra clínica por meio da API', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(addressResponse({ logradouro: 'Av. Recife' })));
+      const createClinicSpy = vi.spyOn(apiClient, 'registrationControllerRegister').mockResolvedValue({
+        status: 201,
+        headers: new Headers(),
+        data: { isActive: false, role: 'USER', requestedRole: 'CLINICA' },
+      } as never);
+
+      openRegistration();
+      fireEvent.click(screen.getByRole('button', { name: 'Equipe e instituições' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Selecionar clínica' }));
+      fireEvent.change(screen.getByLabelText(/Razão social/), { target: { value: 'Clínica Saúde Recife LTDA' } });
+      fireEvent.change(screen.getByLabelText(/Telefone/), { target: { value: '8133334444' } });
+      fireEvent.change(screen.getByLabelText(/E-mail/), { target: { value: 'CONTATO@CLINICASAUDE.COM.BR' } });
+      fillAddress();
+      fireEvent.click(screen.getByRole('button', { name: 'Próximo' }));
+
+      await screen.findByRole('heading', { name: 'Dados específicos da clínica' });
+      fireEvent.change(screen.getByLabelText(/Nome fantasia/), { target: { value: 'Clínica Saúde' } });
+      const cnpj = screen.getByLabelText(/^CNPJ/);
+      fireEvent.change(cnpj, { target: { value: '11222333000180' } });
+      fireEvent.change(screen.getByLabelText(/Tipo de estabelecimento/), { target: { value: 'CLINICA_MEDICA' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+      expect(await screen.findByText('Informe um CNPJ válido com 14 dígitos.')).toBeInTheDocument();
+
+      fireEvent.change(cnpj, { target: { value: '11222333000181' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Revisar dados' }));
+
+      expect(await screen.findByText('11.222.333/0001-81')).toBeInTheDocument();
+      expect(screen.getByText('Clínica médica')).toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText(/Senha/), { target: { value: 'uma-senha-segura-123' } });
+      fireEvent.change(screen.getByLabelText(/Confirme a senha/), { target: { value: 'uma-senha-segura-123' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Enviar solicitação' }));
+      await screen.findByRole('heading', { level: 1, name: 'Solicitação enviada!' });
+      expect(createClinicSpy).toHaveBeenCalledWith(expect.objectContaining({
+        profile: 'CLINICA',
+        name: 'Clínica Saúde Recife LTDA',
+        clinicTradeName: 'Clínica Saúde',
+        clinicCnpj: '11222333000181',
+        clinicFacilityType: 'CLINICA_MEDICA',
+        phone: '(81) 3333-4444',
+        email: 'contato@clinicasaude.com.br',
+        postalCode: '50000000',
+        street: 'Rua das Flores',
+        houseNumber: '10',
+        password: 'uma-senha-segura-123',
+      }));
+    });
 
   it('rejeita formatos inválidos e datas futuras, permitindo omitir respostas opcionais', () => {
     const valid = { ...emptyBasicData, name: 'Maria Silva', cpf: '12345678900', birthDate: '2000-01-15', phone: '81999999999', email: 'maria@example.com', address: 'Rua das Flores, Recife' };

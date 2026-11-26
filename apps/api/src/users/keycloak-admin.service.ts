@@ -39,6 +39,8 @@ export interface ProviderUserInput {
   name: string;
   email: string;
   role: UserRole;
+  password?: string;
+  enabled?: boolean;
 }
 
 const ROLE_TO_KEYCLOAK: Record<UserRole, string> = {
@@ -67,9 +69,14 @@ export class KeycloakAdminService {
         email: input.email,
         firstName: input.name,
         lastName: '',
-        enabled: true,
+        enabled: input.enabled ?? true,
         emailVerified: false,
-        requiredActions: ['UPDATE_PASSWORD'],
+        ...(input.password
+          ? {
+              credentials: [{ type: 'password', value: input.password, temporary: false }],
+              requiredActions: [],
+            }
+          : { requiredActions: ['UPDATE_PASSWORD'] }),
       }),
     }, [201]);
 
@@ -106,7 +113,10 @@ export class KeycloakAdminService {
     };
   }
 
-  async updateUser(userId: string, input: Partial<ProviderUserInput>): Promise<ProviderUserState> {
+  async updateUser(
+    userId: string,
+    input: Partial<Pick<ProviderUserInput, 'name' | 'email' | 'role'>>,
+  ): Promise<ProviderUserState> {
     const previous = await this.getUserState(userId);
     const desiredRole = input.role ?? previous.applicationRole;
     try {

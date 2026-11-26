@@ -32,23 +32,88 @@ enum WorkShift {
   INTEGRAL
 }
 
+enum ClinicFacilityType {
+  CLINICA_MEDICA
+  CLINICA_ODONTOLOGICA
+  LABORATORIO
+  HOSPITAL
+  POSTO_DE_SAUDE
+  OUTRO
+}
+
 model UserProfile {
-  id                    String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  keycloakUserId        String                 @unique
-  name                  String
-  email                 String                 @unique
-  cpf                   String?                @unique
-  birthDate             DateTime?              @db.Date
-  phone                 String?
-  address               String?
-  roleSnapshot          UserRole               @default(USER)
-  isActiveLocal         Boolean                @default(true)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  sessions              Session[]
-  administrativeProfile AdministrativeProfile?
+  id                        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  keycloakUserId            String                     @unique
+  name                      String
+  email                     String                     @unique
+  cpf                       String?                    @unique
+  birthDate                 DateTime?                  @db.Date
+  phone                     String?
+  address                   String?
+  postalCode                String?
+  street                    String?
+  houseNumber               String?
+  addressComplement         String?
+  socialName                String?
+  roleSnapshot              UserRole                   @default(USER)
+  requestedRole             UserRole?
+  isActiveLocal             Boolean                    @default(true)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  sessions                  Session[]
+  administrativeProfile     AdministrativeProfile?
+  clinicProfile             ClinicProfile?
+  patientProfile            PatientProfile?
+  healthProfessionalProfile HealthProfessionalProfile?
+  studentProfile            StudentProfile?
 
   @@map("user_profiles")
+}
+
+model PatientProfile {
+  id                    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userProfileId         String      @unique @db.Uuid
+  cns                   String?     @unique
+  gender                String?
+  race                  String?
+  bloodType             String?
+  hasAllergies          String?
+  allergies             String?
+  healthConditions      String?
+  emergencyName         String?
+  emergencyPhone        String?
+  emergencyRelationship String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+  userProfile           UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@map("patient_profiles")
+}
+
+model HealthProfessionalProfile {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userProfileId       String      @unique @db.Uuid
+  professionalCouncil String
+  councilRegistration String
+  specialties         String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  userProfile         UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@map("health_professional_profiles")
+}
+
+model StudentProfile {
+  id                   String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userProfileId        String      @unique @db.Uuid
+  institution          String
+  course               String
+  academicRegistration String
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+  userProfile          UserProfile @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@map("student_profiles")
 }
 
 model AdministrativeProfile {
@@ -63,6 +128,21 @@ model AdministrativeProfile {
   userProfile   UserProfile          @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
 
   @@map("administrative_profiles")
+}
+
+model ClinicProfile {
+  id            String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userProfileId String             @unique @db.Uuid
+  tradeName     String
+  cnpj          String             @unique
+  cnes          String?            @unique
+  facilityType  ClinicFacilityType
+  specialties   String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  userProfile   UserProfile        @relation(fields: [userProfileId], references: [id], onDelete: Cascade)
+
+  @@map("clinic_profiles")
 }
 
 model Session {

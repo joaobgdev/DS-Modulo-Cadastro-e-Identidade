@@ -81,6 +81,9 @@ export class ManagedUserDto {
   @ApiProperty({ enum: UserRole, example: UserRole.USER })
   role!: UserRole;
 
+  @ApiPropertyOptional({ enum: UserRole, nullable: true })
+  requestedRole!: UserRole | null;
+
   @ApiProperty({ example: true })
   isActive!: boolean;
 
