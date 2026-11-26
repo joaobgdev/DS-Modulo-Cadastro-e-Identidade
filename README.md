@@ -262,7 +262,7 @@ Para manter a organização do código, o grupo segue as seguintes convenções:
 * **`fix/...`**: Correção de erros e bugs (ex.: ``).
 
 ### Padronização de Commits (Conventional Commits)
-As mensagens de commit devem ser escritas em inglês e seguir o formato:
+As mensagens de commit devem ser escritas em português e seguir o formato:
 * `setup:` para alterações em configurações e tarefas de build
 * `feat:` para novas funcionalidades
 * `docs:` para atualizações na documentação
