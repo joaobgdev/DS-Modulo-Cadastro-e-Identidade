@@ -778,6 +778,137 @@
           "users"
         ]
       }
+    },
+    "/api/v1/users/administrative": {
+      "post": {
+        "operationId": "AdministrativeController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAdministrativeUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrativeProfileResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appstart_session": []
+          }
+        ],
+        "summary": "Cadastrar profissional administrativo",
+        "tags": [
+          "administrative"
+        ]
+      },
+      "get": {
+        "operationId": "AdministrativeController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdministrativeProfileResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appstart_session": []
+          }
+        ],
+        "summary": "Listar profissionais administrativos",
+        "tags": [
+          "administrative"
+        ]
+      }
+    },
+    "/api/v1/users/administrative/{id}": {
+      "get": {
+        "operationId": "AdministrativeController_findById",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdministrativeProfileResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "appstart_session": []
+          }
+        ],
+        "summary": "Consultar dados funcionais de um profissional administrativo",
+        "tags": [
+          "administrative"
+        ]
+      }
     }
   },
   "info": {
@@ -896,7 +1027,12 @@
             "type": "string",
             "enum": [
               "USER",
-              "ADMIN"
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
             ],
             "example": "USER"
           }
@@ -938,7 +1074,12 @@
             "type": "string",
             "enum": [
               "USER",
-              "ADMIN"
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
             ],
             "example": "USER"
           },
@@ -1028,7 +1169,12 @@
             "type": "string",
             "enum": [
               "USER",
-              "ADMIN"
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
             ],
             "example": "USER"
           }
@@ -1071,7 +1217,12 @@
             "type": "string",
             "enum": [
               "USER",
-              "ADMIN"
+              "ADMIN",
+              "CLINICA",
+              "PACIENTE",
+              "ADMINISTRATIVO",
+              "SAUDE",
+              "ESTUDANTE"
             ],
             "example": "ADMIN"
           }
@@ -1087,6 +1238,167 @@
         },
         "required": [
           "isActive"
+        ]
+      },
+      "CreateAdministrativeUserDto": {
+        "type": "object",
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "Maria Silva",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "cpf": {
+            "type": "string",
+            "example": "000.000.000-00"
+          },
+          "nascimento": {
+            "type": "string",
+            "example": "1995-05-20",
+            "description": "Data de nascimento (YYYY-MM-DD)"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "(81) 90000-0000"
+          },
+          "email": {
+            "type": "string",
+            "example": "maria.silva@clinica.ufpe.br",
+            "maxLength": 254
+          },
+          "endereco": {
+            "type": "string",
+            "example": "Av. Prof. Moraes Rego, 1235, Cidade Universitária, Recife"
+          },
+          "setor": {
+            "type": "string",
+            "enum": [
+              "RECEPCAO",
+              "FATURAMENTO",
+              "FINANCEIRO",
+              "RH",
+              "SUPRIMENTOS"
+            ],
+            "example": "RECEPCAO"
+          },
+          "cargo": {
+            "type": "string",
+            "example": "Assistente administrativo",
+            "minLength": 2,
+            "maxLength": 100
+          },
+          "matricula": {
+            "type": "string",
+            "example": "ADM-0421",
+            "maxLength": 30
+          },
+          "turno": {
+            "type": "string",
+            "enum": [
+              "MANHA",
+              "TARDE",
+              "NOITE",
+              "INTEGRAL"
+            ],
+            "example": "MANHA"
+          }
+        },
+        "required": [
+          "nome",
+          "cpf",
+          "nascimento",
+          "telefone",
+          "email",
+          "endereco",
+          "setor",
+          "cargo",
+          "turno"
+        ]
+      },
+      "AdministrativeProfileResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "nome": {
+            "type": "string",
+            "example": "Maria Silva"
+          },
+          "cpf": {
+            "type": "string",
+            "example": "00000000000"
+          },
+          "nascimento": {
+            "type": "string",
+            "example": "1995-05-20"
+          },
+          "telefone": {
+            "type": "string",
+            "example": "(81) 90000-0000"
+          },
+          "email": {
+            "type": "string",
+            "example": "maria.silva@clinica.ufpe.br"
+          },
+          "endereco": {
+            "type": "string",
+            "example": "Av. Prof. Moraes Rego, 1235, Recife"
+          },
+          "setor": {
+            "type": "string",
+            "enum": [
+              "RECEPCAO",
+              "FATURAMENTO",
+              "FINANCEIRO",
+              "RH",
+              "SUPRIMENTOS"
+            ],
+            "example": "RECEPCAO"
+          },
+          "cargo": {
+            "type": "string",
+            "example": "Assistente administrativo"
+          },
+          "matricula": {
+            "type": "object",
+            "example": "ADM-0421",
+            "nullable": true
+          },
+          "turno": {
+            "type": "string",
+            "enum": [
+              "MANHA",
+              "TARDE",
+              "NOITE",
+              "INTEGRAL"
+            ],
+            "example": "MANHA"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "example": "2026-11-24T13:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "nome",
+          "cpf",
+          "nascimento",
+          "telefone",
+          "email",
+          "endereco",
+          "setor",
+          "cargo",
+          "turno",
+          "isActive",
+          "createdAt"
         ]
       }
     }

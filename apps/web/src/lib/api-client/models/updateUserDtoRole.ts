@@ -12,4 +12,9 @@ export type UpdateUserDtoRole = typeof UpdateUserDtoRole[keyof typeof UpdateUser
 export const UpdateUserDtoRole = {
   USER: 'USER',
   ADMIN: 'ADMIN',
+  CLINICA: 'CLINICA',
+  PACIENTE: 'PACIENTE',
+  ADMINISTRATIVO: 'ADMINISTRATIVO',
+  SAUDE: 'SAUDE',
+  ESTUDANTE: 'ESTUDANTE',
 } as const;

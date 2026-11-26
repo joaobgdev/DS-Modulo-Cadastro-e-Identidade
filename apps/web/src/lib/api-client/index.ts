@@ -6,9 +6,11 @@
  * OpenAPI spec version: 1.0.0
  */
 import type {
+  AdministrativeProfileResponseDto,
   AuthControllerCallbackParams,
   AuthControllerLoginParams,
   AuthMeResponseDto,
+  CreateAdministrativeUserDto,
   CreateUserDto,
   LoginRequestDto,
   ManagedUserDto,
@@ -141,8 +143,16 @@ export const authControllerDirectLogin = async (loginRequestDto: LoginRequestDto
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return customFetch<authControllerDirectLoginResponse>(getAuthControllerDirectLoginUrl(),
   {
@@ -557,8 +567,16 @@ export const userControllerCreate = async (createUserDto: CreateUserDto, options
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return customFetch<userControllerCreateResponse>(getUserControllerCreateUrl(),
   {
@@ -611,8 +629,16 @@ export const userControllerUpdateMe = async (updateSelfUserDto: UpdateSelfUserDt
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return customFetch<userControllerUpdateMeResponse>(getUserControllerUpdateMeUrl(),
   {
@@ -729,8 +755,16 @@ export const userControllerUpdate = async (id: string,
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return customFetch<userControllerUpdateResponse>(getUserControllerUpdateUrl(id),
   {
@@ -794,8 +828,16 @@ export const userControllerSetStatus = async (id: string,
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
-    if (Array.isArray(h)) return Object.fromEntries(h);
-    return h;
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
   };
 return customFetch<userControllerSetStatusResponse>(getUserControllerSetStatusUrl(id),
   {
@@ -805,5 +847,147 @@ return customFetch<userControllerSetStatusResponse>(getUserControllerSetStatusUr
     body: JSON.stringify(setUserStatusDto)
   }
 );}
+
+
+
+export type administrativeControllerCreateResponse201 = {
+  data: AdministrativeProfileResponseDto
+  status: 201
+}
+
+export type administrativeControllerCreateResponse400 = {
+  data: ProblemDetailsDto
+  status: 400
+}
+
+export type administrativeControllerCreateResponse409 = {
+  data: ProblemDetailsDto
+  status: 409
+}
+
+export type administrativeControllerCreateResponseSuccess = (administrativeControllerCreateResponse201) & {
+  headers: Headers;
+};
+export type administrativeControllerCreateResponseError = (administrativeControllerCreateResponse400 | administrativeControllerCreateResponse409) & {
+  headers: Headers;
+};
+
+export type administrativeControllerCreateResponse = (administrativeControllerCreateResponseSuccess | administrativeControllerCreateResponseError)
+
+export const getAdministrativeControllerCreateUrl = () => {
+
+
+
+
+  return `/api/v1/users/administrative`
+}
+
+/**
+ * @summary Cadastrar profissional administrativo
+ */
+export const administrativeControllerCreate = async (createAdministrativeUserDto: CreateAdministrativeUserDto, options?: Parameters<typeof customFetch>[1]): Promise<administrativeControllerCreateResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<administrativeControllerCreateResponse>(getAdministrativeControllerCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createAdministrativeUserDto)
+  }
+);}
+
+
+
+export type administrativeControllerFindAllResponse200 = {
+  data: AdministrativeProfileResponseDto[]
+  status: 200
+}
+
+export type administrativeControllerFindAllResponseSuccess = (administrativeControllerFindAllResponse200) & {
+  headers: Headers;
+};
+;
+
+export type administrativeControllerFindAllResponse = (administrativeControllerFindAllResponseSuccess)
+
+export const getAdministrativeControllerFindAllUrl = () => {
+
+
+
+
+  return `/api/v1/users/administrative`
+}
+
+/**
+ * @summary Listar profissionais administrativos
+ */
+export const administrativeControllerFindAll = async ( options?: Parameters<typeof customFetch>[1]): Promise<administrativeControllerFindAllResponse> => {
+
+  return customFetch<administrativeControllerFindAllResponse>(getAdministrativeControllerFindAllUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export type administrativeControllerFindByIdResponse200 = {
+  data: AdministrativeProfileResponseDto
+  status: 200
+}
+
+export type administrativeControllerFindByIdResponse404 = {
+  data: ProblemDetailsDto
+  status: 404
+}
+
+export type administrativeControllerFindByIdResponseSuccess = (administrativeControllerFindByIdResponse200) & {
+  headers: Headers;
+};
+export type administrativeControllerFindByIdResponseError = (administrativeControllerFindByIdResponse404) & {
+  headers: Headers;
+};
+
+export type administrativeControllerFindByIdResponse = (administrativeControllerFindByIdResponseSuccess | administrativeControllerFindByIdResponseError)
+
+export const getAdministrativeControllerFindByIdUrl = (id: string,) => {
+
+
+
+
+  return `/api/v1/users/administrative/${id}`
+}
+
+/**
+ * @summary Consultar dados funcionais de um profissional administrativo
+ */
+export const administrativeControllerFindById = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<administrativeControllerFindByIdResponse> => {
+
+  return customFetch<administrativeControllerFindByIdResponse>(getAdministrativeControllerFindByIdUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
 
 

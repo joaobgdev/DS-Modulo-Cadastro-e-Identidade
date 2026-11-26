@@ -12,4 +12,9 @@ export type ManagedUserDtoRole = typeof ManagedUserDtoRole[keyof typeof ManagedU
 export const ManagedUserDtoRole = {
   USER: 'USER',
   ADMIN: 'ADMIN',
+  CLINICA: 'CLINICA',
+  PACIENTE: 'PACIENTE',
+  ADMINISTRATIVO: 'ADMINISTRATIVO',
+  SAUDE: 'SAUDE',
+  ESTUDANTE: 'ESTUDANTE',
 } as const;

@@ -6,9 +6,16 @@
  * OpenAPI spec version: 1.0.0
  */
 
+export * from './administrativeProfileResponseDto';
+export * from './administrativeProfileResponseDtoMatricula';
+export * from './administrativeProfileResponseDtoSetor';
+export * from './administrativeProfileResponseDtoTurno';
 export * from './authControllerCallbackParams';
 export * from './authControllerLoginParams';
 export * from './authMeResponseDto';
+export * from './createAdministrativeUserDto';
+export * from './createAdministrativeUserDtoSetor';
+export * from './createAdministrativeUserDtoTurno';
 export * from './createUserDto';
 export * from './createUserDtoRole';
 export * from './loginRequestDto';

@@ -41,6 +41,18 @@ export interface ProviderUserInput {
   role: UserRole;
 }
 
+const ROLE_TO_KEYCLOAK: Record<UserRole, string> = {
+  ADMIN: 'admin',
+  USER: 'user',
+  CLINICA: 'clinica',
+  PACIENTE: 'paciente',
+  ADMINISTRATIVO: 'administrativo',
+  SAUDE: 'saude',
+  ESTUDANTE: 'estudante',
+};
+
+const APPLICATION_KEYCLOAK_ROLES = new Set(Object.values(ROLE_TO_KEYCLOAK));
+
 @Injectable()
 export class KeycloakAdminService {
   private accessToken?: { value: string; expiresAt: number };
@@ -83,9 +95,14 @@ export class KeycloakAdminService {
     const roles = await this.json<KeycloakRoleRepresentation[]>(
       `/users/${encodeURIComponent(userId)}/role-mappings/realm`,
     );
+
+    const matchedEntry = (Object.entries(ROLE_TO_KEYCLOAK) as [UserRole, string][]).find(
+      ([, kcRole]) => roles.some((role) => role.name === kcRole),
+    );
+
     return {
       user,
-      applicationRole: roles.some((role) => role.name === 'admin') ? 'ADMIN' : 'USER',
+      applicationRole: matchedEntry ? matchedEntry[0] : 'USER',
     };
   }
 
@@ -138,7 +155,7 @@ export class KeycloakAdminService {
   private async setApplicationRole(userId: string, role: UserRole): Promise<void> {
     const mappingPath = `/users/${encodeURIComponent(userId)}/role-mappings/realm`;
     const assigned = await this.json<KeycloakRoleRepresentation[]>(mappingPath);
-    const applicationRoles = assigned.filter((item) => item.name === 'admin' || item.name === 'user');
+    const applicationRoles = assigned.filter((item) => APPLICATION_KEYCLOAK_ROLES.has(item.name));
     if (applicationRoles.length > 0) {
       await this.request(mappingPath, {
         method: 'DELETE',
@@ -146,7 +163,7 @@ export class KeycloakAdminService {
       }, [204]);
     }
 
-    const roleName = role === 'ADMIN' ? 'admin' : 'user';
+    const roleName = ROLE_TO_KEYCLOAK[role] ?? 'user';
     const desired = await this.json<KeycloakRoleRepresentation>(`/roles/${encodeURIComponent(roleName)}`);
     await this.request(mappingPath, {
       method: 'POST',

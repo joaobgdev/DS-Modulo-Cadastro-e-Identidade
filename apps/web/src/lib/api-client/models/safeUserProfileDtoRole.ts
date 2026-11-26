@@ -12,4 +12,9 @@ export type SafeUserProfileDtoRole = typeof SafeUserProfileDtoRole[keyof typeof 
 export const SafeUserProfileDtoRole = {
   USER: 'USER',
   ADMIN: 'ADMIN',
+  CLINICA: 'CLINICA',
+  PACIENTE: 'PACIENTE',
+  ADMINISTRATIVO: 'ADMINISTRATIVO',
+  SAUDE: 'SAUDE',
+  ESTUDANTE: 'ESTUDANTE',
 } as const;

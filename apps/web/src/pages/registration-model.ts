@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import {
+  CreateAdministrativeUserDtoSetor,
+  CreateAdministrativeUserDtoTurno,
+} from '../lib/api-client/models';
 
 export const registrationProfiles = [
   { id: 'patient', label: 'Paciente', description: 'Para quem vai fazer consultas, exames ou receber atendimento na clínica.' },
@@ -21,6 +25,22 @@ export const emergencyRelationships = [
   'Mãe', 'Pai', 'Cônjuge/companheiro(a)', 'Filho(a)', 'Irmão/irmã', 'Responsável legal', 'Amigo(a)', 'Outro',
 ] as const;
 
+export const administrativeSectors = [
+  { value: CreateAdministrativeUserDtoSetor.RECEPCAO, label: 'Recepção / Atendimento' },
+  { value: CreateAdministrativeUserDtoSetor.FATURAMENTO, label: 'Faturamento' },
+  { value: CreateAdministrativeUserDtoSetor.FINANCEIRO, label: 'Financeiro' },
+  { value: CreateAdministrativeUserDtoSetor.RH, label: 'Recursos Humanos (RH)' },
+  { value: CreateAdministrativeUserDtoSetor.SUPRIMENTOS, label: 'Suprimentos' },
+] as const;
+
+export const administrativeShifts = [
+  { value: CreateAdministrativeUserDtoTurno.MANHA, label: 'Manhã' },
+  { value: CreateAdministrativeUserDtoTurno.TARDE, label: 'Tarde' },
+  { value: CreateAdministrativeUserDtoTurno.NOITE, label: 'Noite' },
+  { value: CreateAdministrativeUserDtoTurno.INTEGRAL, label: 'Integral' },
+] as const;
+
+export const administrativeSpecificFields = ['adminSector', 'adminRoleTitle', 'adminRegistration', 'adminShift'] as const;
 export const emergencyFields = ['emergencyName', 'emergencyPhone', 'emergencyRelationship'] as const;
 
 export function formatCpf(value: string) {
@@ -50,7 +70,6 @@ export function formatCns(value: string) {
     .filter(Boolean).join(' ');
 }
 
-// Nesta etapa validamos o formato; a regra de dígitos verificadores é KAN-105.
 export const basicDataSchema = z.object({
   name: z.string().trim().min(2, 'Informe o nome completo.').max(120, 'Use no máximo 120 caracteres.'),
   cpf: z.string().trim().min(1, 'Informe o CPF.').refine(
@@ -88,6 +107,34 @@ const teamDataSchema = basicDataSchema.extend({
   emergencyName: z.string(),
   emergencyPhone: z.string(),
   emergencyRelationship: z.string(),
+  adminSector: z.string(),
+  adminRoleTitle: z.string(),
+  adminRegistration: z.string(),
+  adminShift: z.string(),
+});
+
+const administrativeDataSchema = teamDataSchema.extend({
+  adminSector: z.enum(
+    [
+      CreateAdministrativeUserDtoSetor.RECEPCAO,
+      CreateAdministrativeUserDtoSetor.FATURAMENTO,
+      CreateAdministrativeUserDtoSetor.FINANCEIRO,
+      CreateAdministrativeUserDtoSetor.RH,
+      CreateAdministrativeUserDtoSetor.SUPRIMENTOS,
+    ],
+    { message: 'Selecione o setor de atuação.' },
+  ),
+  adminRoleTitle: z.string().trim().min(2, 'Informe o cargo (mínimo 2 caracteres).').max(100, 'Use no máximo 100 caracteres.'),
+  adminRegistration: z.string().trim().max(30, 'Use no máximo 30 caracteres.'),
+  adminShift: z.enum(
+    [
+      CreateAdministrativeUserDtoTurno.MANHA,
+      CreateAdministrativeUserDtoTurno.TARDE,
+      CreateAdministrativeUserDtoTurno.NOITE,
+      CreateAdministrativeUserDtoTurno.INTEGRAL,
+    ],
+    { message: 'Selecione o turno de trabalho.' },
+  ),
 });
 
 const optionalChoice = (options: readonly [string, ...string[]]) =>
@@ -126,8 +173,11 @@ const patientDataSchema = teamDataSchema.extend({
   }
 });
 
-export const registrationSchema = (profile: RegistrationProfile | null) =>
-  profile === 'patient' ? patientDataSchema : teamDataSchema;
+export const registrationSchema = (profile: RegistrationProfile | null) => {
+  if (profile === 'patient') return patientDataSchema;
+  if (profile === 'administrative') return administrativeDataSchema;
+  return teamDataSchema;
+};
 
 export type BasicData = z.infer<typeof teamDataSchema>;
 export const emptyBasicData: BasicData = {
@@ -136,4 +186,5 @@ export const emptyBasicData: BasicData = {
   usesSocialName: '', socialName: '',
   gender: '', race: '', bloodType: '', hasAllergies: '', allergies: '', healthConditions: '',
   emergencyName: '', emergencyPhone: '', emergencyRelationship: '',
+  adminSector: '', adminRoleTitle: '', adminRegistration: '', adminShift: '',
 };
