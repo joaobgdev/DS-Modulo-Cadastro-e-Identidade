@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,6 +35,7 @@ const createUserSchema = z.object({
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
 export function UsersPage() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -154,10 +156,22 @@ export function UsersPage() {
           </p>
         </div>
 
-        <Button onClick={() => setIsCreateModalOpen(true)} className="gap-1.5 shrink-0">
-          <Plus className="h-4 w-4" />
-          Novo Usuário
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate('/cadastro')}
+            className="gap-1.5 shrink-0"
+          >
+            <Plus className="h-4 w-4" />
+            Profissional Administrativo
+          </Button>
+
+          <Button onClick={() => setIsCreateModalOpen(true)} className="gap-1.5 shrink-0">
+            <Plus className="h-4 w-4" />
+            Novo Usuário
+          </Button>
+        </div>
       </div>
 
       {feedback && (
@@ -253,7 +267,13 @@ export function UsersPage() {
                       {item.email}
                     </td>
                     <td className="py-3.5 px-4">
-                      <Badge variant={item.role === 'ADMIN' ? 'default' : 'secondary'}>
+                      <Badge
+                        variant={
+                          item.role === 'ADMIN' || item.role === 'ADMINISTRATIVO'
+                            ? 'default'
+                            : 'secondary'
+                        }
+                      >
                         {item.role}
                       </Badge>
                     </td>
