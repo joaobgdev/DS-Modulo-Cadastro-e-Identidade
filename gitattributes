@@ -1,0 +1,8 @@
+# Deixa o Git decidir o que é texto e normaliza os finais de linha
+* text=auto
+
+# Arquivos que rodam em Linux/containers precisam ser sempre LF
+*.sh text eol=lf
+infra/** text eol=lf
+compose.yaml text eol=lf
+Dockerfile* text eol=lf
